@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog Upload — Easy Guide (for non-technical users)</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --primary: #2563eb;
+    --primary-light: #dbeafe;
+    --success: #059669;
+    --success-light: #d1fae5;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --danger: #dc2626;
+    --danger-light: #fee2e2;
+    --code-bg: #f3f4f6;
+    --quote-bg: #eff6ff;
+    --quote-border: #3b82f6;
+    --tag-bg: #ecfdf5;
+    --tag-color: #047857;
+    --tag-border: #6ee7b7;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .container {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  .surface {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 32px 40px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  }
+  h1 {
+    font-size: 2rem;
+    margin: 0 0 8px;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  h1 .subtitle {
+    display: block;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  h2 {
+    font-size: 1.4rem;
+    margin: 40px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+    color: var(--text);
+    scroll-margin-top: 16px;
+  }
+  h2:first-child { margin-top: 0; }
+  h3 {
+    font-size: 1.1rem;
+    margin: 28px 0 12px;
+    color: var(--text);
+    scroll-margin-top: 16px;
+  }
+  p { margin: 12px 0; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, Consolas, "Courier New", monospace;
+    font-size: 0.9em;
+    color: #b91c1c;
+  }
+  pre {
+    background: #1f2937;
+    color: #e5e7eb;
+    padding: 16px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: "SF Mono", Monaco, Consolas, "Courier New", monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  blockquote {
+    margin: 16px 0;
+    padding: 12px 20px;
+    background: var(--quote-bg);
+    border-left: 4px solid var(--quote-border);
+    border-radius: 0 6px 6px 0;
+    color: #1e3a8a;
+    font-style: normal;
+  }
+  blockquote p { margin: 4px 0; }
+  blockquote code {
+    background: #ffffff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+  }
+  .at-tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--tag-color);
+    border: 1px solid var(--tag-border);
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, Consolas, monospace;
+    font-size: 0.88em;
+    font-weight: 600;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: var(--bg);
+    font-weight: 600;
+    color: var(--text);
+  }
+  td:first-child { white-space: nowrap; }
+  .callout {
+    margin: 16px 0;
+    padding: 14px 18px;
+    border-radius: 8px;
+    border-left: 4px solid;
+  }
+  .callout-tip {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: #1e3a8a;
+  }
+  .callout-warn {
+    background: var(--warning-light);
+    border-color: var(--warning);
+    color: #78350f;
+  }
+  .callout-success {
+    background: var(--success-light);
+    border-color: var(--success);
+    color: #064e3b;
+  }
+  .callout-danger {
+    background: var(--danger-light);
+    border-color: var(--danger);
+    color: #7f1d1d;
+  }
+  .platform-note {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 6px 12px;
+    background: var(--success-light);
+    color: #064e3b;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+  a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+  a:hover { text-decoration: underline; }
+
+  /* Checklist */
+  .checklist {
+    list-style: none;
+    padding: 0;
+  }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    margin: 8px 0;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .checklist input[type="checkbox"] {
+    margin-top: 5px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--primary);
+  }
+  .checklist .step-num {
+    font-weight: 700;
+    color: var(--primary);
+    white-space: nowrap;
+  }
+
+  /* Step badge */
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  /* Menu path crumbs */
+  .menu-path {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #1f2937;
+    color: #e5e7eb;
+    border-radius: 6px;
+    font-family: "SF Mono", Monaco, Consolas, monospace;
+    font-size: 0.875rem;
+    margin: 4px 0;
+  }
+  .menu-path .arrow { color: #9ca3af; }
+
+  /* Don't list */
+  .dont-list {
+    list-style: none;
+    padding: 0;
+  }
+  .dont-list li {
+    padding: 10px 14px;
+    margin: 6px 0;
+    background: var(--danger-light);
+    border-left: 4px solid var(--danger);
+    border-radius: 0 6px 6px 0;
+    color: #7f1d1d;
+  }
+
+  /* Q&A */
+  .qa { margin: 16px 0; }
+  .qa-q {
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .qa-a { margin-left: 0; color: var(--text); }
+
+  /* Key tip */
+  .key-tip {
+    background: var(--warning-light);
+    border: 1px solid var(--warning);
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin: 16px 0;
+    color: #78350f;
+  }
+
+  /* Print friendly */
+  @media print {
+    body { background: white; }
+    .surface { box-shadow: none; padding: 0; }
+    .container { padding: 0; max-width: none; }
+  }
+  @media (max-width: 600px) {
+    .container { padding: 16px; }
+    .surface { padding: 20px; }
+    h1 { font-size: 1.6rem; }
+    pre { font-size: 0.78rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="surface">
+    <h1>Blog Upload — Easy Guide
+      <span class="subtitle">For non-technical users · No coding required</span>
+    </h1>
+
+    <p>Hi! This guide shows you how to upload blog drafts to a client's WordPress site using an <strong>AI coding agent</strong> — Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, opencode, whichever your team uses. <strong>You don't need to know any code — you just type plain-English prompts.</strong></p>
+
+    <p>What the tool does for you:</p>
+    <ul>
+      <li>Reads your blog brief (a Markdown file).</li>
+      <li>Picks the right client — and if it's a <strong>new</strong> client, walks you through setting it up.</li>
+      <li>Creates a <strong>draft</strong> post on WordPress (it never publishes — you do that yourself).</li>
+    </ul>
+
+    <p><strong>What you normally tell it:</strong> the <strong>client name</strong> + the <strong>brief file</strong>. That's all. The agent asks you for anything else it needs (which section to use, a missing login, etc.).</p>
+
+    <div style="text-align:center;">
+      <div class="platform-note">✅ Works on Mac, Windows, and Linux — launch your agent from your work folder; it creates the workspace there the first time, then finds it.</div>
+    </div>
+  </div>
+
+  <div class="surface">
+    <h2>How you talk to your agent</h2>
+    <p><strong>Name the skill when you ask</strong> — that's how the agent knows to use <em>this</em> tool instead of guessing. In Claude Code you tag it: type <span class="at-tag">@blog-upload</span>. In other agents, say "use the blog-upload skill". Point at your brief the same way — <code>@my-brief.md</code> in Claude Code, or just name the file.</p>
+    <div class="callout callout-tip">💡 <strong>Keep the <code>blog-upload</code> folder in your working directory and tag it explicitly.</strong> Don't rely on the agent auto-detecting it — auto-invoke can misfire (trigger when you don't want it, or stay quiet during an upload when you do).</div>
+    <p><strong>Example (Claude Code):</strong></p>
+    <blockquote><span class="at-tag">@blog-upload</span> upload <code>@my-brief.md</code> for Acme Catering</blockquote>
+    <p><strong>Other agents:</strong></p>
+    <blockquote>Use the blog-upload skill to upload <code>my-brief.md</code> for Acme Catering.</blockquote>
+    <p>The agent does the rest — reads the brief, finds the client, and creates the draft.</p>
+  </div>
+
+  <div class="surface">
+    <h2>📋 Ready-Made Prompts <span style="font-weight:400;font-size:1rem;color:var(--muted);">(copy-paste — works in any agent)</span></h2>
+    <p>Each prompt pairs plain English with the exact command, so the agent acts reliably. Copy-paste the whole block into the chat — the <strong>agent</strong> runs the command, not you.</p>
+
+    <p><strong>① Set up the skill — first time only</strong></p>
+    <blockquote>Clone the blog-upload skill and set up its workspace for me. Run <code>git clone https://github.com/Xd06eR/wp-blog-upload-skill.git blog-upload</code>, then go into the <code>blog-upload</code> folder and initialize the workspace.</blockquote>
+
+    <p><strong>② Upload a blog</strong></p>
+    <blockquote>Using the blog-upload skill, upload <code>‹your-brief.md›</code> for <code>‹Client Name›</code> as a WordPress draft, then give me the draft link. (Claude Code shortcut: <span class="at-tag">@blog-upload</span> <code>upload @‹your-brief.md› for ‹Client Name›</code>)</blockquote>
+    <ul>
+      <li>If the file has sections for several clients, the agent shows the list and asks which one.</li>
+      <li>If the client is new, the agent notices and walks you through adding it (it asks you for the WordPress site address, username, and an application password).</li>
+    </ul>
+
+    <p><strong>③ Update the skill to the latest version</strong></p>
+    <blockquote>Update my blog-upload skill to the latest version: run <code>git pull</code> inside the <code>blog-upload</code> folder, then tell me what changed.</blockquote>
+
+    <div class="callout callout-tip">
+      💡 <strong>If anything ever looks off, just tell the agent in plain English what happened</strong> ("the upload failed — what went wrong?"). It explains, fixes it, or asks you for what it needs. You never have to memorize commands or troubleshoot yourself.
+    </div>
+  </div>
+
+  <div class="surface">
+    <h2>🗒️ Your First Day Checklist</h2>
+    <ul class="checklist">
+      <li><input type="checkbox"><div><span class="step-num">Step 1.</span> Set up the skill + workspace (prompt ① above) — <em>one-time</em></div></li>
+      <li><input type="checkbox"><div><span class="step-num">Step 2.</span> Get your blog brief as Markdown</div></li>
+      <li><input type="checkbox"><div><span class="step-num">Step 3.</span> Upload it (prompt ②) — the agent handles the rest</div></li>
+      <li><input type="checkbox"><div><span class="step-num">Step 4.</span> Open the draft in WordPress, fill the meta, hit Publish</div></li>
+    </ul>
+    <div class="callout callout-tip">After today you only repeat Steps 2–4.</div>
+  </div>
+
+  <div class="surface">
+    <h2>Step by step</h2>
+
+    <h3><span class="step-badge">1</span>Get the skill + workspace (one time)</h3>
+    <p><strong>Just ask your agent:</strong> paste prompt ① above. It clones the skill <strong>and</strong> sets up the workspace — a <code>blog-upload-workspace</code> folder where your briefs and saved client info live. You never open a terminal or manage that folder by hand.</p>
+
+    <h3><span class="step-badge">2</span>Get your brief as Markdown</h3>
+    <p>Markdown (<code>.md</code>) is the <strong>recommended, most reliable</strong> format — the skill is built for it. Other formats <em>may</em> work, but Markdown is the safe, stable choice, so use it whenever you can.</p>
+    <p><strong>Option 1 — download the whole brief (easiest):</strong></p>
+    <ol>
+      <li>Open the brief in <strong>Google Docs</strong>.</li>
+      <li>Menu:
+        <div><span class="menu-path">File <span class="arrow">▸</span> Download <span class="arrow">▸</span> Markdown (.md)</span></div>
+      </li>
+      <li>It lands in your Downloads folder (e.g. <code>my-blog-brief.md</code>).</li>
+    </ol>
+    <p><strong>Option 2 — copy just one section as Markdown:</strong></p>
+    <ol>
+      <li><strong>One-time setup:</strong> turn Markdown on —
+        <div><span class="menu-path">Tools <span class="arrow">▸</span> Preferences <span class="arrow">▸</span> ✓ Enable Markdown</span></div>
+      </li>
+      <li>Select the part of the doc you want.</li>
+      <li><strong>Edit → Copy as Markdown</strong> (or right-click → Copy as Markdown).</li>
+      <li>Paste into any plain-text editor and save the file with a <code>.md</code> ending.</li>
+    </ol>
+    <h3><span class="step-badge">3</span>Upload it</h3>
+    <p><strong>Easiest — ask your agent</strong> (paste prompt ②, or use your agent's file shortcut). Give the <strong>client name</strong> + the <strong>file</strong>. The agent then:</p>
+    <ul>
+      <li>finds the client (or sets it up if it's new — asking you for the login),</li>
+      <li>asks which section if the file has several,</li>
+      <li>creates the draft and gives you the <strong>edit link</strong>.</li>
+    </ul>
+    <p>Your brief's wording is always copied <strong>word-for-word</strong> — the agent never rewrites your writer's content. If a brief's layout is unusual the agent sorts it out automatically; if it's genuinely unreadable it stops and asks you to check, rather than guessing.</p>
+
+    <h3><span class="step-badge">4</span>Finish in WordPress</h3>
+    <p>Open the <strong>edit link</strong> the agent gives you, then in WP admin:</p>
+    <ol>
+      <li>Fill the <strong>Yoast / RankMath meta title + description</strong> (these can't be set automatically — do it by hand).</li>
+      <li>Add a featured image, internal links, etc.</li>
+      <li>When happy, hit <strong>Publish</strong> yourself.</li>
+    </ol>
+    <div class="callout callout-success">🎉 Done.</div>
+  </div>
+
+  <div class="surface">
+    <h2>Keeping the skill updated</h2>
+    <p><strong>Just ask your agent:</strong> paste prompt ③ above. The agent updates the skill and tells you what changed — nothing for you to run.</p>
+  </div>
+
+  <div class="surface">
+    <h2>What NOT to do</h2>
+    <ul class="dont-list">
+      <li>❌ Don't paste WordPress passwords into the chat — the agent will tell you to put them in a file instead.</li>
+      <li>❌ Don't hand-edit the <code>data/</code> folder or delete <code>clients.db</code> — that's the agent's memory of your clients.</li>
+      <li>❌ Don't expect it to publish — it makes <strong>drafts</strong> only, on purpose. Nothing goes live until you click Publish yourself.</li>
+    </ul>
+  </div>
+
+  <div class="surface">
+    <h2>Who to ask if you're stuck</h2>
+    <ul>
+      <li><strong>The tool itself</strong> → open an issue on the repo.</li>
+      <li><strong>WordPress login / role problems</strong> → whoever manages that WP site.</li>
+    </ul>
+    <p style="text-align: center; margin-top: 24px; color: var(--muted);">Happy uploading! ✨</p>
+  </div>
+
+</div>
+</body>
+</html>

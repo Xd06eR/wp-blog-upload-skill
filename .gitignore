@@ -1,0 +1,28 @@
+# Workspace state (created at runtime, never commit)
+blog-upload-workspace/
+*-workspace/
+*.db
+data/secrets/
+data/playbooks/
+data/clients.db
+
+# Credentials
+.env
+.env.local
+_pending.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
