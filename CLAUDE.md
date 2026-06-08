@@ -64,12 +64,12 @@ Data flow:
 ## Key components
 
 - **`tools/parse_md.py`** — strict markdown parser + `inspect()` debug dump. Handles single- and multi-client briefs (`### **Brand**` sections). Strips markdown backslash-escapes (see "Markdown escaping" below).
-- **`tools/workspace.py`** — resolves the workspace root. Order: **downward search** for the nearest `blog-upload-workspace/` in a sub-folder of `$PWD` (breadth-first, shallowest wins; skips hidden + heavy dirs; bounded by depth + a scanned-dir cap) → otherwise created in the current directory (`$PWD/blog-upload-workspace`). No override flag, no env var.
+- **`tools/workspace.py`** — resolves the workspace root. Order: **downward search** (nearest `blog-upload-workspace/` in a sub-folder of `$PWD`; breadth-first, shallowest wins; skips hidden + heavy dirs; bounded) → **upward search** (first `blog-upload-workspace/` beside an ancestor of `$PWD`, bounded by `_MAX_WALKUP_DEPTH`; resolves the siblings layout when a command runs from inside the skill) → **beside the skill** (`<skill>/../blog-upload-workspace`, anchored via `__file__`): used if present, else the create target. `root()` always returns a path; `find()` returns an existing workspace or `None`, and read-only CLI commands use `find()` so they never create a phantom workspace. No override flag, no env var.
 - **`adapters/`** — one renderer per editor. All three demote body `<h1>` to `<h2>` (post title is already the page H1) and inject a hidden `<!-- TODO META FOR HUMAN -->` comment carrying the meta-title/description.
 - **`tools/client_store.py` + `schema.sql`** — SQLite registry (`clients`, `client_history` with `ON DELETE CASCADE`).
 - **`tools/onboarding.py`** — credentials flow: file → CLI → chmod-600 secrets file (the DB records only the path). The agent never sees a raw password.
 - **`tools/wp_client.py`** — thin WP REST client (`urllib`).
-- **`tools/playbook.py`** — per-client agent memory (`playbooks/<slug>.md`).
+- **`tools/playbook.py`** — per-client agent memory (`playbooks/<slug>.md`). Two layers: an always-load **index** (`build_index()` → `playbook-index` CLI) of curated `summary` + brand `aliases` per client (frontmatter; hybrid-falls back to the newest headline), and the lazy full **body** (`read(slug)`). The index resolves brand→slug *before* client pick; `set_meta()`/`append_lesson(summary=, aliases=)` curate it.
 
 ## Invocation convention
 

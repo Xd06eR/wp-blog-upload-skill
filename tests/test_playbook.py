@@ -23,8 +23,16 @@ class PlaybookTest(unittest.TestCase):
         self.cwd = Path(self._tmp.name).resolve()
         self._cwd_patch = mock.patch.object(workspace.Path, "cwd", return_value=self.cwd)
         self._cwd_patch.start()
+        # Pin the beside-skill canonical workspace into the tmp tree so root()
+        # never falls back to the real workspace when nothing is found.
+        self._canon = mock.patch.object(
+            workspace, "_canonical_workspace",
+            return_value=self.cwd / "blog-upload-workspace",
+        )
+        self._canon.start()
 
     def tearDown(self) -> None:
+        self._canon.stop()
         self._cwd_patch.stop()
         self._tmp.cleanup()
 

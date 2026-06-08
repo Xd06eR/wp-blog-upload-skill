@@ -23,9 +23,10 @@ The `python3 -m scripts.run ...` commands below are **your** tools, not the oper
 
 `$WORKSPACE` resolves in this order:
 1. **Downward search**: the nearest `blog-upload-workspace/` in a sub-folder of `$PWD` (breadth-first, shallowest wins; skips hidden + heavy dirs like `node_modules`/`.git`; bounded by depth + a scanned-dir cap).
-2. **`$PWD/blog-upload-workspace`** (created in the current folder if nothing is found below).
+2. **Upward search**: if nothing is below, walk `$PWD`'s parents and take the first `blog-upload-workspace/` beside an ancestor — so running from *inside* the skill folder (a sibling of the workspace) still resolves the real one.
+3. **Beside the skill**: otherwise `<skill>/../blog-upload-workspace` (sibling of the skill folder). Used if it already exists, and is the **create target** when a write command needs to make one. **Read-only commands (`playbook-index`, `list-clients`, `show-workspace`, …) never create a workspace** — if none is found they return empty.
 
-`show-workspace` prints the resolved path AND how it was found (`source: subfolder | cwd`). Inspect it before any new run if you suspect ambiguity.
+`show-workspace` prints the resolved path AND how it was found (`source: subfolder | parent | canonical`). Inspect it before any new run if you suspect ambiguity.
 
 In the commands below, `<skill-dir>` is the absolute path to **this skill folder** — the directory holding this `SKILL.md` and `scripts/`. Substitute the real path when you run a command (e.g. if the skill is at `~/blog-upload`, run `PYTHONPATH=~/blog-upload python3 -B -m scripts.run ...`). No environment variable or `~/.bashrc` setup is required: resolve the path from wherever the skill is installed — the `@blog-upload` tag points you at it.
 

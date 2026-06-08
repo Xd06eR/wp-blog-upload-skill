@@ -107,7 +107,10 @@ def _run_show_workspace() -> int:
 
 
 def _run_list_clients() -> int:
-    workspace.ensure()
+    # Read-only: resolve an existing workspace, never create one.
+    if workspace.find() is None:
+        print(json.dumps([], indent=2))
+        return 0
     from .tools.client_store import get_store
     store = get_store()
     rows = []
@@ -125,7 +128,11 @@ def _run_list_clients() -> int:
 
 
 def _run_playbook_index() -> int:
-    workspace.ensure()
+    # Read-only: resolve an existing workspace, never create one (a missing
+    # workspace just means an empty index).
+    if workspace.find() is None:
+        print(json.dumps([], indent=2))
+        return 0
     from .tools.playbook import build_index
     print(json.dumps(build_index(), indent=2))
     return 0
