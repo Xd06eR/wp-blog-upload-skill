@@ -35,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("init-workspace", help="Create the workspace folder skeleton if missing.")
     sub.add_parser("show-workspace", help="Print the resolved workspace path + state.")
     sub.add_parser("list-clients", help="Print every registered client (JSON).")
+    sub.add_parser("playbook-index",
+                   help="Print the always-load playbook index (one record per client: summary + aliases).")
 
     p_onboard = sub.add_parser("onboard", help="Register a new client from a credentials JSON.")
     p_onboard.add_argument("--from-file", required=True,
@@ -72,6 +74,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_show_workspace()
     if args.cmd == "list-clients":
         return _run_list_clients()
+    if args.cmd == "playbook-index":
+        return _run_playbook_index()
     if args.cmd == "onboard":
         return _run_onboard(args)
     if args.cmd == "list-briefs":
@@ -117,6 +121,13 @@ def _run_list_clients() -> int:
                 "editor": cfg.editor,
             })
     print(json.dumps(rows, indent=2))
+    return 0
+
+
+def _run_playbook_index() -> int:
+    workspace.ensure()
+    from .tools.playbook import build_index
+    print(json.dumps(build_index(), indent=2))
     return 0
 
 

@@ -109,6 +109,7 @@ All commands run with `PYTHONPATH=<skill-dir> python3 -B -m scripts.run`, where 
 | `init-workspace` | Create `$PWD/blog-upload-workspace/` skeleton | Human readable |
 | `show-workspace` | Print resolved workspace path + dirs | JSON |
 | `list-clients` | List registered clients | JSON: `[{slug, display_name, wp_base_url, editor}, ...]` |
+| `playbook-index` | Always-load cross-client memory: one record per playbook — curated `summary` + brand `aliases` (hybrid: falls back to newest headline). Run at Phase 1 **before** client pick to resolve brand→slug | JSON: `[{slug, summary, aliases, source}, ...]` |
 | `onboard --from-file <path>` | Verify creds against WP, write `<slug>.json`, insert client row, delete pending file | Human readable |
 | `list-briefs --doc <path.md>` | Pre-scan markdown for client sections (strict parser) | JSON: `[{brand, page_url, h1, word_count}, ...]` |
 | `inspect-brief --doc <path.md>` | Dump every table + heading + counts in a brief (debug aid when strict parser returns `[]`) | JSON: `{section_headers, tables, headings, paragraph_count, list_count}` |
@@ -221,7 +222,28 @@ The editor is selected per-client from `clients.editor`. Onboarding auto-detects
 
 ## Self-improvement: the playbook
 
-`scripts/tools/playbook.py` stores per-client lessons in `data/playbooks/<slug>.md`. After a non-obvious run, append a lesson:
+`scripts/tools/playbook.py` stores per-client lessons in `data/playbooks/<slug>.md`. It exposes **two access layers** (progressive disclosure):
+
+- **Index (always loaded).** `build_index()` — surfaced by the `playbook-index` CLI command — returns one compact record per client: a curated `summary` plus brand `aliases`. The agent loads this on EVERY run at Phase 1 Step 0, *before* picking a client. This is what fixes the brand→slug chicken-and-egg: a mapping like "ProKitchens → `foodwork`" lives in the index, so it surfaces without already knowing the slug. Hybrid: uses the frontmatter `summary` when set, else the newest lesson headline (so legacy playbooks still say something). The `source` field flags which was used (`summary` | `headline` | `empty`).
+- **Body (lazy).** `read(slug)` — the full dated journal for ONE client, loaded only once the client is known (Phase 1.5).
+
+File shape — optional frontmatter carries the index fields; the journal follows:
+
+```markdown
+---
+summary: ProKitchens (FR/ES/NL/PT/IT/PL) -> foodwork; one multilingual install, drafts default to IT.
+aliases: prokitchens
+---
+# Playbook — foodwork
+
+## YYYY-MM-DD — headline
+
+<1-3 sentences>
+```
+
+Frontmatter is parsed by a tiny stdlib reader (no PyYAML): `key: value` lines between two `---` fences; `aliases` is comma-separated.
+
+After a non-obvious run, append a lesson. Pass `summary` / `aliases` too when the fact should load on every run (especially a brand→slug mapping):
 
 ```python
 from scripts.tools.playbook import append_lesson
@@ -229,10 +251,14 @@ append_lesson(
     slug="acmecatering",
     headline="Multi-brief layout uses H3 brand headings",
     body="The brand sections are `### **Name**`. Sub-headings inside the body sometimes also use `###` — filter by checking for a leading pipe table.",
+    summary="AcmeCatering multi-brief — H3 `### **Name**` brand sections; filter by leading pipe table.",  # optional: lands in the always-load index
+    aliases=["acme catering"],                                                                            # optional: brand the operator might name
 )
 ```
 
-Entries are dated `## YYYY-MM-DD — headline`. The live file holds the most recent 5 entries; older ones rotate to `<slug>.archive.md`.
+To curate the index line **without** adding a dated entry (e.g. backfill a mapping onto a legacy playbook), use `set_meta(slug, summary=..., aliases=[...])`; aliases merge by default (`replace_aliases=True` to overwrite).
+
+Entries are dated `## YYYY-MM-DD — headline`. The live file holds the most recent 5 entries; older ones rotate to `<slug>.archive.md`. Frontmatter is preserved across rotation.
 
 **When to record:**
 

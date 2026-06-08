@@ -43,11 +43,21 @@ PYTHONPATH=<skill-dir> python3 -B -m scripts.run show-workspace
 
 ## Phase 1 — Pick the client
 
+**Step 0 — Load the playbook index FIRST, before listing clients (always).**
+
+```bash
+PYTHONPATH=<skill-dir> python3 -B -m scripts.run playbook-index
+```
+
+A compact JSON array, one record per client: `{slug, summary, aliases, source}`. This is your cross-client memory, loaded every run — each client's one-line critical fact plus brand `aliases`. Read it BEFORE anything else: the brand an operator names often differs from the slug it uploads under (e.g. **ProKitchens → `foodwork`**). A per-slug body read (Phase 1.5) cannot surface that — you'd need the slug to find the mapping that gives you the slug. Scan every `aliases` and `summary` for the operator's brand; a match hands you the slug directly.
+
+**Step 1 — List registered clients.**
+
 ```bash
 PYTHONPATH=<skill-dir> python3 -B -m scripts.run list-clients
 ```
 
-Ask: *"Which client?"* Fuzzy-match against the JSON. Confirm a single strong hit: *"Did you mean **<display_name>** (`<slug>`)?"* and wait.
+Ask: *"Which client?"* Resolve the operator's brand against BOTH the playbook-index aliases (Step 0) and this client list. Confirm a single strong hit: *"Did you mean **<display_name>** (`<slug>`)?"* and wait.
 
 **No match -> onboarding.** NEVER ask for credentials in chat:
 
@@ -72,7 +82,7 @@ SLUG=<slug>
 test -f $WS/data/playbooks/$SLUG.md && cat $WS/data/playbooks/$SLUG.md
 ```
 
-If the playbook flags a known brief quirk for this client (e.g. "sometimes URL row is missing"), apply it. Skip silently if none.
+Step 0 already gave you this client's one-line `summary`; this is the full journal — the dated detail behind it. The `summary:`/`aliases:` frontmatter at the top is exactly what the index reads; the `## YYYY-MM-DD` entries below are the depth. If the playbook flags a known brief quirk for this client (e.g. "sometimes URL row is missing"), apply it. Skip silently if none.
 
 ## Phase 2 — Pick the brief
 
@@ -168,6 +178,21 @@ append_lesson(slug='<slug>',
               body='''<1-3 sentences>''')
 "
 ```
+
+**If the lesson is a headline-level fact that must load on EVERY run — above all a brand→slug mapping** (operator names a brand that uploads under a different slug) — also pass `summary=` and `aliases=`. They land in the always-loaded index (Phase 1, Step 0), so next time the mapping surfaces *before* client pick instead of being buried in a slug you don't know yet:
+
+```bash
+PYTHONPATH=<skill-dir> python3 -B -c "
+from scripts.tools.playbook import append_lesson
+append_lesson(slug='foodwork',
+              headline='ProKitchens (all langs) map to foodwork',
+              body='''Multilingual WP install; REST drafts default to Italian — set language + Yoast by hand.''',
+              summary='ProKitchens (FR/ES/NL/PT/IT/PL) → foodwork; one multilingual install, drafts default to IT.',
+              aliases=['prokitchens'])
+"
+```
+
+To fix an index line *without* adding a dated entry, call `set_meta(slug, summary='...', aliases=[...])` instead of `append_lesson`.
 
 ## Hard rules
 
