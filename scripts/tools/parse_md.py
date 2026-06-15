@@ -52,10 +52,11 @@ class Brief:
 
 @dataclass
 class Block:
-    """One body element. kind is heading / paragraph / list."""
-    kind: str  # 'h1' | 'h2' | 'h3' | 'h4' | 'paragraph' | 'list'
+    """One body element. kind is heading / paragraph / list / table."""
+    kind: str  # 'h1' | 'h2' | 'h3' | 'h4' | 'paragraph' | 'list' | 'table'
     text: str = ""
     items: list[str] = field(default_factory=list)
+    rows: list[list[str]] = field(default_factory=list)  # table: row-major cell HTML
 
 
 @dataclass

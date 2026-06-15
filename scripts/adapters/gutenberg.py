@@ -32,6 +32,8 @@ def _render_block(block: Block) -> str:
         return _paragraph_block(block.text)
     if block.kind == "list":
         return _list_block(block.items)
+    if block.kind == "table":
+        return _table_block(block.rows)
     return ""
 
 
@@ -65,6 +67,27 @@ def _list_block(items: list[str]) -> str:
         "<!-- wp:list -->\n"
         f"<ul>\n{li}\n</ul>\n"
         "<!-- /wp:list -->"
+    )
+
+
+def _cell(text: str) -> str:
+    return text if _contains_html(text) else html.escape(text)
+
+
+def _table_block(rows: list[list[str]]) -> str:
+    if not rows:
+        return ""
+
+    def tr(cells: list[str], tag: str) -> str:
+        return "<tr>" + "".join(f"<{tag}>{_cell(c)}</{tag}>" for c in cells) + "</tr>"
+
+    head = f"<thead>{tr(rows[0], 'th')}</thead>" if rows else ""
+    body_rows = "".join(tr(r, "td") for r in rows[1:])
+    body = f"<tbody>{body_rows}</tbody>" if body_rows else ""
+    return (
+        "<!-- wp:table -->\n"
+        f'<figure class="wp-block-table"><table>{head}{body}</table></figure>\n'
+        "<!-- /wp:table -->"
     )
 
 

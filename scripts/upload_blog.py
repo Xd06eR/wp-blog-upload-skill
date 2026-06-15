@@ -23,7 +23,7 @@ from .tools.wp_client import WPClient, WPCredentials
 __all__ = ["ClientConfig", "UploadResult", "upload_blog", "upload_prepared"]
 
 
-_ALLOWED_BLOCK_KINDS = {"h1", "h2", "h3", "h4", "paragraph", "list"}
+_ALLOWED_BLOCK_KINDS = {"h1", "h2", "h3", "h4", "paragraph", "list", "table"}
 
 
 @dataclass

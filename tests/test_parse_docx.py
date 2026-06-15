@@ -184,6 +184,36 @@ class ParseDocxHouseSingleTest(unittest.TestCase):
         self.assertEqual(briefs[0].word_count, "1000")
 
 
+class ParseDocxInBodyTableTest(unittest.TestCase):
+    """A nested Word table inside the body cell -> a `table` Block, in order."""
+
+    def setUp(self) -> None:
+        self._paths: list[str] = []
+
+    def tearDown(self) -> None:
+        for p in self._paths:
+            Path(p).unlink(missing_ok=True)
+
+    def test_nested_table_becomes_table_block_in_position(self) -> None:
+        nested = _table(
+            _row(_cell(_p(_r("Time"))), _cell(_p(_r("Event")))),
+            _row(_cell(_p(_r("08:00"))), _cell(_p(_r("Tea ceremony")))),
+        )
+        body = (
+            _p(_r("H1: Wedding", bold=True))
+            + _p(_r("Before the table."))
+            + nested
+            + _p(_r("After the table."))
+        )
+        path = _docx(_house_body(body))
+        self._paths.append(path)
+        doc = parse_docx.parse(path)
+        kinds = [b.kind for b in doc.body]
+        self.assertEqual(kinds, ["paragraph", "table", "paragraph"])
+        tbl = doc.body[1]
+        self.assertEqual(tbl.rows, [["Time", "Event"], ["08:00", "Tea ceremony"]])
+
+
 def _h3(text: str) -> str:
     return f'<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>{_r(text)}</w:p>'
 

@@ -114,6 +114,18 @@ class DocxReaderTest(unittest.TestCase):
         self.assertEqual(len(cell.tables), 1)
         self.assertEqual(cell.tables[0].rows[0][0].text, "08:00")
 
+    def test_cell_blocks_preserve_para_table_order(self) -> None:
+        inner = "<w:tbl><w:tr><w:tc>" + _p(_r("grid")) + "</w:tc></w:tr></w:tbl>"
+        tbl = (
+            "<w:tbl><w:tr>"
+            f"<w:tc>{_p(_r('VI. Body content'))}</w:tc>"
+            f"<w:tc>{_p(_r('before'))}{inner}{_p(_r('after'))}</w:tc>"
+            "</w:tr></w:tbl>"
+        )
+        cell = self._read(tbl).tables[0].rows[0][1]
+        kinds = [type(b).__name__ for b in cell.blocks]
+        self.assertEqual(kinds, ["Para", "Table", "Para"])
+
     def test_block_order_preserved(self) -> None:
         body = _p(_r("intro")) + "<w:tbl><w:tr><w:tc>" + _p(_r("x")) + "</w:tc></w:tr></w:tbl>" + _p(_r("outro"))
         kinds = [type(b).__name__ for b in self._read(body).blocks]

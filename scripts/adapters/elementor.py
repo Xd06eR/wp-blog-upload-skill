@@ -98,7 +98,27 @@ def _block_to_widget(block: Block) -> dict | None:
             },
             "elements": [], "isInner": False,
         }
+    if block.kind == "table":
+        table_html = _table_html(block.rows)
+        return {
+            "id": _eid(), "elType": "widget",
+            "widgetType": "text-editor", "settings": {"editor": table_html},
+            "elements": [], "isInner": False,
+        }
     return None
+
+
+def _table_html(rows: list[list[str]]) -> str:
+    if not rows:
+        return ""
+
+    def tr(cells: list[str], tag: str) -> str:
+        return "<tr>" + "".join(f"<{tag}>{_safe(c)}</{tag}>" for c in cells) + "</tr>"
+
+    head = f"<thead>{tr(rows[0], 'th')}</thead>"
+    body_rows = "".join(tr(r, "td") for r in rows[1:])
+    body = f"<tbody>{body_rows}</tbody>" if body_rows else ""
+    return f"<table>{head}{body}</table>"
 
 
 def _block_to_html(block: Block) -> str:
@@ -110,6 +130,8 @@ def _block_to_html(block: Block) -> str:
     if block.kind == "list":
         items = "".join(f"<li>{_safe(i)}</li>" for i in block.items)
         return f"<ul>{items}</ul>"
+    if block.kind == "table":
+        return _table_html(block.rows)
     return ""
 
 

@@ -36,7 +36,25 @@ def _render_block(block: Block) -> str:
             for i in block.items
         )
         return f"<ul>{items}</ul>"
+    if block.kind == "table":
+        return _table_html(block.rows)
     return ""
+
+
+def _table_html(rows: list[list[str]]) -> str:
+    if not rows:
+        return ""
+
+    def cell(text: str) -> str:
+        return text if _contains_html(text) else html.escape(text)
+
+    def tr(cells: list[str], tag: str) -> str:
+        return "<tr>" + "".join(f"<{tag}>{cell(c)}</{tag}>" for c in cells) + "</tr>"
+
+    head = f"<thead>{tr(rows[0], 'th')}</thead>"
+    body_rows = "".join(tr(r, "td") for r in rows[1:])
+    body = f"<tbody>{body_rows}</tbody>" if body_rows else ""
+    return f"<table>{head}{body}</table>"
 
 
 def _todo_meta_comment(doc: ParsedDoc) -> str:

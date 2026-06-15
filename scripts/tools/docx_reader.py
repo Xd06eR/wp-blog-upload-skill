@@ -180,11 +180,23 @@ class Para:
 
 
 class Cell:
-    """One ``<w:tc>`` table cell: its paragraphs plus any nested tables."""
+    """One ``<w:tc>`` table cell.
 
-    def __init__(self, paras: list[Para], tables: list["Table"]):
-        self.paras = paras
-        self.tables = tables
+    ``blocks`` preserves document order (paragraphs and nested tables
+    interleaved); ``paras`` / ``tables`` are order-losing views kept for
+    convenience.
+    """
+
+    def __init__(self, blocks: list["Para | Table"]):
+        self.blocks = blocks
+
+    @property
+    def paras(self) -> list[Para]:
+        return [b for b in self.blocks if isinstance(b, Para)]
+
+    @property
+    def tables(self) -> list["Table"]:
+        return [b for b in self.blocks if isinstance(b, Table)]
 
     @property
     def text(self) -> str:
@@ -232,14 +244,13 @@ def _build_table(tbl_el: ET.Element, rels: dict[str, str]) -> Table:
     for tr in tbl_el.findall(_w("tr")):
         row: list[Cell] = []
         for tc in tr.findall(_w("tc")):
-            paras: list[Para] = []
-            nested: list[Table] = []
+            blocks: list[Para | Table] = []
             for child in tc:
                 if child.tag == _w("p"):
-                    paras.append(Para(child, rels))
+                    blocks.append(Para(child, rels))
                 elif child.tag == _w("tbl"):
-                    nested.append(_build_table(child, rels))
-            row.append(Cell(paras, nested))
+                    blocks.append(_build_table(child, rels))
+            row.append(Cell(blocks))
         rows.append(row)
     return Table(rows)
 

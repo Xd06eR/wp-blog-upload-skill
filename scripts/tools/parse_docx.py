@@ -126,17 +126,33 @@ def _extract_brief(doc: docx_reader.Document) -> Brief:
     return brief
 
 
+def _table_block(table: docx_reader.Table) -> Block:
+    """A nested in-body table -> a ``table`` Block (row-major cell HTML).
+
+    The body cell sometimes embeds a real Word table (schedule / comparison
+    grid). ParsedDoc carries it as ``kind='table'`` with ``rows`` so the
+    adapters can emit valid ``<table>`` markup instead of a mangled
+    ``<p><table></p>``.
+    """
+    rows = [[cell.text and (cell.paras[0].html if cell.paras else cell.text) or ""
+             for cell in row] for row in table.rows]
+    return Block(kind="table", rows=rows)
+
+
 def _parse_body_cell(cell: docx_reader.Cell) -> tuple[str, list[Block]]:
-    """Turn the body cell's paragraphs into (title, blocks).
+    """Turn the body cell's ordered blocks into (title, blocks).
 
     H1 becomes the post title (not a block, matching parse_md). H2-H4 are
-    heading blocks; everything else is a paragraph block rendered with
-    inline links/bold preserved.
+    heading blocks; nested tables become ``table`` blocks in place; every
+    other paragraph is a paragraph block with inline links/bold preserved.
     """
     title = ""
     blocks: list[Block] = []
-    for para in cell.paras:
-        text = para.text
+    for item in cell.blocks:
+        if isinstance(item, docx_reader.Table):
+            blocks.append(_table_block(item))
+            continue
+        text = item.text
         if not text:
             continue
         m = _HEADING_RE.match(text)
@@ -149,7 +165,7 @@ def _parse_body_cell(cell: docx_reader.Cell) -> tuple[str, list[Block]]:
                 continue
             blocks.append(Block(kind=f"h{level}", text=_convert_inline(heading_text)))
             continue
-        blocks.append(Block(kind="paragraph", text=para.html))
+        blocks.append(Block(kind="paragraph", text=item.html))
     return title, blocks
 
 
