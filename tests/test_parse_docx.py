@@ -184,5 +184,112 @@ class ParseDocxHouseSingleTest(unittest.TestCase):
         self.assertEqual(briefs[0].word_count, "1000")
 
 
+def _h3(text: str) -> str:
+    return f'<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>{_r(text)}</w:p>'
+
+
+class ParseDocxMultiBodyTest(unittest.TestCase):
+    """One .docx, several VI. Body content tables (the 6-blog translation shape)."""
+
+    def setUp(self) -> None:
+        self._paths: list[str] = []
+        # Topic with a ZH original (full meta) + an EN translation (IV/V only,
+        # inherits the ZH page_url + word count).
+        zh = (
+            self._page_url("https://shop.example/", "800")
+            + _field("II. Keyword(s) for the page", "kw a kw b")
+            + _field("IV. Page title", "中文標題")
+            + _field("V. Meta description", "中文描述")
+            + self._body(_p(_r("H1: 中文標題", bold=True)) + _p(_r("中文內文")))
+        )
+        en = (
+            _field("IV. Page title", "English Title")
+            + _field("V. Meta description", "English desc")
+            + self._body(_p(_r("H1: English Title", bold=True)) + _p(_r("English body")))
+        )
+        self.path = _docx(zh + en)
+        self._paths.append(self.path)
+
+    def tearDown(self) -> None:
+        for p in self._paths:
+            Path(p).unlink(missing_ok=True)
+
+    @staticmethod
+    def _page_url(url: str, wc: str) -> str:
+        return _table(
+            _row(_cell(_p(_r("I. Page URL"))), _cell(_p(_r("Page Type"))), _cell(_p(_r("Word Count")))),
+            _row(_cell(_p(_r(url))), _cell(_p(_r("New"))), _cell(_p(_r(wc)))),
+        )
+
+    @staticmethod
+    def _body(paras: str) -> str:
+        return _table(_row(_cell(_p(_r("VI. Body content")))), _row(_cell(paras)))
+
+    def test_list_briefs_returns_all_bodies(self) -> None:
+        briefs = parse_docx.list_briefs(self.path)
+        self.assertEqual(len(briefs), 2)
+        self.assertEqual([b.brand for b in briefs], ["中文標題", "English Title"])
+
+    def test_no_brand_raises_with_choices(self) -> None:
+        with self.assertRaises(ParseError) as cm:
+            parse_docx.parse(self.path)
+        self.assertIn("2 body sections", str(cm.exception))
+
+    def test_select_zh_body(self) -> None:
+        doc = parse_docx.parse(self.path, brand="中文標題")
+        self.assertEqual(doc.title, "中文標題")
+        self.assertEqual(doc.brief.page_url, "https://shop.example/")
+
+    def test_translation_inherits_source_url(self) -> None:
+        doc = parse_docx.parse(self.path, brand="English Title")
+        self.assertEqual(doc.title, "English Title")
+        # EN block has no I. Page URL of its own -> inherits the ZH sibling's.
+        self.assertEqual(doc.brief.page_url, "https://shop.example/")
+        self.assertEqual(doc.brief.word_count, "800")
+
+
+class ParseDocxParagraphStreamTest(unittest.TestCase):
+    """No body table; Heading3 brand markers with body in the paragraph stream."""
+
+    def setUp(self) -> None:
+        self._paths: list[str] = []
+        body = (
+            _h3("ChefCollective (EN)")
+            + _p(_r("H1: Kitchen automation", bold=True))
+            + _p(_r("Intro for chef."))
+            + _p(_r("H2: Why automate", bold=True))
+            + _p(_r("Because speed."))
+            + _h3("")  # empty placeholder brand (KitchenPark AR analog) -> skipped
+            + _h3("Freshlane (ZH)")
+            + _p(_r("H1: 廚房自動化", bold=True))
+            + _p(_r("導言。"))
+        )
+        self.path = _docx(body)
+        self._paths.append(self.path)
+
+    def tearDown(self) -> None:
+        for p in self._paths:
+            Path(p).unlink(missing_ok=True)
+
+    def test_list_briefs_skips_empty_brand(self) -> None:
+        briefs = parse_docx.list_briefs(self.path)
+        self.assertEqual([b.brand for b in briefs], ["ChefCollective (EN)", "Freshlane (ZH)"])
+
+    def test_no_brand_raises(self) -> None:
+        with self.assertRaises(ParseError):
+            parse_docx.parse(self.path)
+
+    def test_select_brand_extracts_only_its_body(self) -> None:
+        doc = parse_docx.parse(self.path, brand="ChefCollective (EN)")
+        self.assertEqual(doc.title, "Kitchen automation")
+        texts = " ".join(b.text for b in doc.body)
+        self.assertIn("Because speed.", texts)
+        self.assertNotIn("廚房自動化", texts)  # next brand's body must not bleed in
+
+    def test_select_second_brand(self) -> None:
+        doc = parse_docx.parse(self.path, brand="Freshlane (ZH)")
+        self.assertEqual(doc.title, "廚房自動化")
+
+
 if __name__ == "__main__":
     unittest.main()
