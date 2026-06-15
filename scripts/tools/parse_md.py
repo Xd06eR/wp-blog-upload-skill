@@ -98,8 +98,9 @@ _CLIENT_HEADER = re.compile(
 
 # Body headings sometimes leak into the H3 stream (writer put `**H1: ...**`
 # inside a Heading3 in the source doc). Filter those so we keep only real
-# client section boundaries.
-_BODY_HEADING_NAME = re.compile(r"^\s*H[1-4]\s*:", re.IGNORECASE)
+# client section boundaries. Accepts the full-width colon (U+FF1A) Chinese
+# briefs use and the trailing-period form ("H3.") some writers type.
+_BODY_HEADING_NAME = re.compile(r"^\s*H[1-4]\s*[:：.]", re.IGNORECASE)
 
 
 def _section_has_table(body: str) -> bool:
@@ -246,8 +247,17 @@ def _convert_inline(text: str) -> str:
     return s.strip()
 
 
+# A body heading line. Real Google-Docs exports vary the shape:
+#   **H1: Title**        canonical (bold, ASCII colon)
+#   **H1： 標題**         Chinese full-width colon (U+FF1A)
+#   **H3. 1. Sub**       French/numbered, period instead of colon
+#   #### **H1 : Title**  heading level leaked in as markdown ATX hashes
+#   H2: Title            bold wrapper dropped by the writer
+# The leading `#{0,6}` + optional `**` and the `[:：.]` separator cover all of
+# them; the separator is the first one after the level, so an inner colon in
+# the heading text (e.g. "第一招：選對") stays in the captured group.
 _HEADING_LINE = re.compile(
-    r"^\s*\*\*\s*(H[1-4])\s*:\s*(.+?)\s*\*\*\s*$",
+    r"^\s*#{0,6}\s*\*{0,2}\s*(H[1-4])\s*[:：.]\s*(.+?)\s*\*{0,2}\s*$",
     re.IGNORECASE,
 )
 _LIST_ITEM = re.compile(r"^\s*[-*+]\s+(.+?)\s*$")

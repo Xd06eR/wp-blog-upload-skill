@@ -36,13 +36,15 @@ import re
 from pathlib import Path
 
 from . import docx_reader
-from .parse_md import Block, Brief, BriefSummary, ParseError, ParsedDoc, _convert_inline
+from .parse_md import (
+    Block, Brief, BriefSummary, ParseError, ParsedDoc, _convert_inline,
+    _HEADING_LINE as _HEADING_RE,
+)
 
 # Body headings are typed text ("H1： title" / "H2: title"), NOT Word heading
-# styles. Full-width colon (U+FF1A) is what the Chinese briefs use; ASCII for
-# English. The first colon after the level ends the marker, so any inner colon
-# in the heading text (e.g. "第一招：選對睫毛夾") is preserved in group 2.
-_HEADING_RE = re.compile(r"^\s*#{0,6}\s*H([1-4])\s*[:：.]\s*(.+?)\s*$", re.IGNORECASE)
+# styles. The heading regex is shared with parse_md (_HEADING_LINE) so both
+# intake paths recognize the same shapes -- ASCII + full-width colon, the
+# period form, an optional bold wrapper. Group 1 = level, group 2 = text.
 
 # A field table is identified by its first-cell label. Strip the leading Roman
 # numeral ("iv. ") before matching so the "(Max. Pixel Width …)" suffix is all
@@ -157,7 +159,7 @@ def _parse_body_cell(cell: docx_reader.Cell) -> tuple[str, list[Block]]:
             continue
         m = _HEADING_RE.match(text)
         if m:
-            level = int(m.group(1))
+            level = int(m.group(1)[1])  # group(1) is "Hn" -> the digit
             heading_text = m.group(2).strip()
             if level == 1:
                 if not title:
@@ -260,20 +262,50 @@ def _body_label(brief: Brief, index: int) -> str:
 # ---------- paragraph-stream multi-brief (10-blog: Heading3 per brand) ------
 
 
+def _kv_brief_in_slice(doc: docx_reader.Document, start: int, end: int) -> Brief:
+    """Read the canonical key|value field table inside a brand's block slice.
+
+    The 10-blog brands carry a per-brand table (URL / Meta Title / H1 / Word
+    count) using the same labels as the markdown canonical brief, so the H1 /
+    meta cells give a title fallback when the body stream has no H1 line.
+    """
+    brief = Brief()
+    for block in doc.blocks[start:end]:
+        if not isinstance(block, docx_reader.Table):
+            continue
+        for row in block.rows:
+            if len(row) < 2:
+                continue
+            key = row[0].text.strip().lower()
+            val = row[1].text.strip()
+            if key == "h1" and val:
+                brief.h1 = val
+            elif key == "meta title" and val:
+                brief.meta_title = val
+            elif key == "meta description" and val:
+                brief.meta_description = val
+            elif key == "url" and val.startswith("http"):
+                brief.page_url = val
+            elif key == "word count" and val:
+                brief.word_count = val
+    return brief
+
+
 def _parse_brand_stream(doc: docx_reader.Document, start: int, end: int,
                         *, brand: str, path: Path) -> ParsedDoc:
-    """Parse one brand's body from the paragraph slice (start, end)."""
+    """Parse one brand's body from the block slice (start, end)."""
+    brief = _kv_brief_in_slice(doc, start, end)
     title = ""
     blocks: list[Block] = []
     for block in doc.blocks[start:end]:
-        if not isinstance(block, docx_reader.Para):
-            continue
+        if isinstance(block, docx_reader.Table):
+            continue  # the field table is metadata, not body
         text = block.text
         if not text:
             continue
         m = _HEADING_RE.match(text)
         if m:
-            level = int(m.group(1))
+            level = int(m.group(1)[1])  # group(1) is "Hn" -> the digit
             htext = m.group(2).strip()
             if level == 1:
                 if not title:
@@ -282,9 +314,14 @@ def _parse_brand_stream(doc: docx_reader.Document, start: int, end: int,
             blocks.append(Block(kind=f"h{level}", text=_convert_inline(htext)))
             continue
         blocks.append(Block(kind="paragraph", text=block.html))
-    if not title or not blocks:
-        raise ParseError(f"{path}: brand '{brand}' has no H1 or no body.")
-    return ParsedDoc(brief=Brief(h1=title), body=blocks, title=title, brand=brand)
+    if not blocks:
+        raise ParseError(f"{path}: brand '{brand}' has no body — nothing to upload.")
+    # Title precedence: an H1 in the body, then the field-table H1 / meta title,
+    # finally the brand name (some briefs put the H1 only in a styled line that
+    # is not part of the body stream; the brand label is a safe last resort).
+    title = title or brief.h1 or brief.meta_title or brand
+    brief.h1 = title
+    return ParsedDoc(brief=brief, body=blocks, title=title, brand=brand)
 
 
 # ---------- public dispatch -------------------------------------------------

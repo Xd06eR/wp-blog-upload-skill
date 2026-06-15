@@ -320,6 +320,27 @@ class ParseDocxParagraphStreamTest(unittest.TestCase):
         doc = parse_docx.parse(self.path, brand="Freshlane (ZH)")
         self.assertEqual(doc.title, "廚房自動化")
 
+    def test_brand_with_body_but_no_h1_falls_back_to_brand_name(self) -> None:
+        # FR-style: body has H2/H3 but the H1 lives outside the stream.
+        body = (
+            _h3("ProKitchens (FR)")
+            + _p(_r("Intro sans titre."))
+            + _p(_r("H2 : Une section", bold=True))
+            + _p(_r("Corps."))
+        )
+        path = _docx(body)
+        self._paths.append(path)
+        doc = parse_docx.parse(path, brand="ProKitchens (FR)")
+        self.assertEqual(doc.title, "ProKitchens (FR)")
+        self.assertEqual([b.kind for b in doc.body], ["paragraph", "h2", "paragraph"])
+
+    def test_brand_with_no_body_raises(self) -> None:
+        body = _h3("EmptyBrand") + _h3("NextBrand") + _p(_r("H1: Next", bold=True)) + _p(_r("x"))
+        path = _docx(body)
+        self._paths.append(path)
+        with self.assertRaises(ParseError):
+            parse_docx.parse(path, brand="EmptyBrand")
+
 
 if __name__ == "__main__":
     unittest.main()

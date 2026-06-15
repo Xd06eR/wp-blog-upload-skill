@@ -80,5 +80,61 @@ class UnescapeMarkdownTest(unittest.TestCase):
         self.assertIn("Track waste & costs daily.", self._paragraphs())
 
 
+_VARIANT_BRIEF = """\
+| Content Topic | Variants |
+| :---- | :---- |
+| **URL** | https://example.com/v |
+| **H1** | Main Title |
+| **Word count** | 100 words |
+
+**H1: Main Title**
+
+Intro.
+
+**H2： 全形冒號標題**
+
+中文內文。
+
+**H3. 1. Numbered French Sub**
+
+Body.
+
+#### **H4 : Hash Wrapped**
+
+More body.
+"""
+
+
+class HeadingVariantTest(unittest.TestCase):
+    """B1: heading detection across colon / full-width / period / hash forms."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8")
+        tmp.write(_VARIANT_BRIEF)
+        tmp.close()
+        self.path = tmp.name
+        self.doc = parse_md.parse(self.path)
+
+    def tearDown(self) -> None:
+        Path(self.path).unlink(missing_ok=True)
+
+    def test_full_width_colon_heading_detected(self) -> None:
+        h2 = [b.text for b in self.doc.body if b.kind == "h2"]
+        self.assertIn("全形冒號標題", h2)
+
+    def test_period_numbered_heading_detected(self) -> None:
+        h3 = [b.text for b in self.doc.body if b.kind == "h3"]
+        self.assertIn("1. Numbered French Sub", h3)
+
+    def test_hash_wrapped_heading_detected(self) -> None:
+        h4 = [b.text for b in self.doc.body if b.kind == "h4"]
+        self.assertIn("Hash Wrapped", h4)
+
+    def test_no_heading_leaks_into_paragraphs(self) -> None:
+        paras = " ".join(b.text for b in self.doc.body if b.kind == "paragraph")
+        self.assertNotIn("全形冒號標題", paras)
+        self.assertNotIn("Numbered French Sub", paras)
+
+
 if __name__ == "__main__":
     unittest.main()
