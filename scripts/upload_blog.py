@@ -41,8 +41,9 @@ def upload_blog(
     *,
     brand: str | None = None,
 ) -> UploadResult:
-    """Parse the markdown brief, render content, create a WP draft."""
-    doc = parse_md.parse(doc_path, brand=brand)
+    """Parse the brief (.docx or .md, auto-detected), render, create a WP draft."""
+    from .tools.intake import parser_for
+    doc = parser_for(doc_path).parse(doc_path, brand=brand)
     return _post_parsed_doc(doc, client_cfg)
 
 

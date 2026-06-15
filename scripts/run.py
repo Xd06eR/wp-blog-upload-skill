@@ -198,12 +198,13 @@ def _run_onboard(args) -> int:
 
 def _run_list_briefs(args) -> int:
     from .tools import parse_md
+    from .tools.intake import parser_for
     doc_path = Path(args.doc).expanduser().resolve()
     if not doc_path.exists():
         print(f"ERROR: brief not found: {doc_path}", file=sys.stderr)
         return 2
     try:
-        briefs = parse_md.list_briefs(doc_path)
+        briefs = parser_for(doc_path).list_briefs(doc_path)
     except parse_md.ParseError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
@@ -216,6 +217,13 @@ def _run_inspect_brief(args) -> int:
     doc_path = Path(args.doc).expanduser().resolve()
     if not doc_path.exists():
         print(f"ERROR: brief not found: {doc_path}", file=sys.stderr)
+        return 2
+    if doc_path.suffix.lower() == ".docx":
+        print(
+            "ERROR: inspect-brief is a markdown debug aid. .docx briefs are parsed "
+            "natively -- run list-briefs / upload directly on the .docx.",
+            file=sys.stderr,
+        )
         return 2
     try:
         info = parse_md.inspect(doc_path)
