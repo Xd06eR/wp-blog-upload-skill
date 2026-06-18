@@ -20,7 +20,7 @@ import json
 import uuid
 
 from ..tools.parse_md import Block, ParsedDoc
-from ._escape import build_todo_meta, escape_inline as _safe
+from ._escape import _escape_attr, build_todo_meta, escape_inline as _safe
 
 
 def render(doc: ParsedDoc) -> str:
@@ -98,6 +98,17 @@ def _block_to_widget(block: Block) -> dict | None:
             "widgetType": "text-editor", "settings": {"editor": table_html},
             "elements": [], "isInner": False,
         }
+    if block.kind == "image":
+        if not block.media_url:
+            return None
+        return {
+            "id": _eid(), "elType": "widget",
+            "widgetType": "image", "settings": {
+                "image": {"url": block.media_url, "id": block.media_id},
+                "image_size": "large",
+            },
+            "elements": [], "isInner": False,
+        }
     return None
 
 
@@ -125,6 +136,13 @@ def _block_to_html(block: Block) -> str:
         return f"<ul>{items}</ul>"
     if block.kind == "table":
         return _table_html(block.rows)
+    if block.kind == "image":
+        if not block.media_url:
+            return ""
+        return (
+            f'<figure><img src="{_escape_attr(block.media_url)}" '
+            f'alt="{_escape_attr(block.alt)}"/></figure>'
+        )
     return ""
 
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..tools.parse_md import Block, ParsedDoc
-from ._escape import build_todo_meta, escape_inline
+from ._escape import _escape_attr, build_todo_meta, escape_inline
 
 
 def render(doc: ParsedDoc) -> str:
@@ -27,7 +27,19 @@ def _render_block(block: Block) -> str:
         return f"<ul>{items}</ul>"
     if block.kind == "table":
         return _table_html(block.rows)
+    if block.kind == "image":
+        return _image_html(block)
     return ""
+
+
+def _image_html(block: Block) -> str:
+    # Skip an unresolved image rather than emit a broken <img> with empty src.
+    if not block.media_url:
+        return ""
+    src = _escape_attr(block.media_url)
+    alt = _escape_attr(block.alt)
+    cls = f' class="wp-image-{block.media_id}"' if block.media_id else ""
+    return f'<figure><img src="{src}" alt="{alt}"{cls}/></figure>'
 
 
 def _table_html(rows: list[list[str]]) -> str:

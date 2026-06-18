@@ -9,7 +9,7 @@ fields after the upload (those plugins do NOT support REST).
 from __future__ import annotations
 
 from ..tools.parse_md import Block, ParsedDoc
-from ._escape import build_todo_meta, escape_inline
+from ._escape import _escape_attr, build_todo_meta, escape_inline
 
 
 def render(doc: ParsedDoc) -> str:
@@ -32,6 +32,8 @@ def _render_block(block: Block) -> str:
         return _list_block(block.items)
     if block.kind == "table":
         return _table_block(block.rows)
+    if block.kind == "image":
+        return _image_block(block)
     return ""
 
 
@@ -62,6 +64,22 @@ def _list_block(items: list[str]) -> str:
         "<!-- wp:list -->\n"
         f"<ul>\n{li}\n</ul>\n"
         "<!-- /wp:list -->"
+    )
+
+
+def _image_block(block: Block) -> str:
+    # Skip an unresolved image (upload failed/omitted) rather than emit a broken
+    # <img> with an empty src.
+    if not block.media_url:
+        return ""
+    src = _escape_attr(block.media_url)
+    alt = _escape_attr(block.alt)
+    id_attr = f' {{"id":{block.media_id}}}' if block.media_id else ""
+    cls = f' class="wp-image-{block.media_id}"' if block.media_id else ""
+    return (
+        f"<!-- wp:image{id_attr} -->\n"
+        f'<figure class="wp-block-image"><img src="{src}" alt="{alt}"{cls}/></figure>\n'
+        "<!-- /wp:image -->"
     )
 
 

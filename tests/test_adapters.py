@@ -12,7 +12,7 @@ import json
 import unittest
 
 from scripts import adapters
-from scripts.adapters._escape import build_todo_meta, comment_safe, escape_inline
+from scripts.adapters._escape import _escape_attr, build_todo_meta, comment_safe, escape_inline
 from scripts.tools.parse_md import Block, Brief, ParsedDoc
 
 
@@ -145,6 +145,59 @@ class TodoMetaCommentTest(unittest.TestCase):
             # the raw "--> book now" run that would escape the comment is gone
             self.assertNotIn("--> book now", out)
             self.assertNotIn("--> limited", out)
+
+
+class EscapeAttrTest(unittest.TestCase):
+    """Image alt/src land in double-quoted attributes -- escape & < > and \"."""
+
+    def test_escapes_quote_amp_angles(self) -> None:
+        self.assertEqual(_escape_attr('a "b" & <c>'), "a &quot;b&quot; &amp; &lt;c&gt;")
+
+    def test_does_not_double_escape_existing_entity(self) -> None:
+        self.assertEqual(_escape_attr("x &amp; y"), "x &amp; y")
+
+
+_IMG = Block(
+    kind="image",
+    media_id=7,
+    media_url="https://example.test/wp-content/uploads/a.jpg",
+    alt='Alt "q" & <co>',
+)
+
+
+class ImageRenderTest(unittest.TestCase):
+    """Resolved image blocks render valid per-editor image markup."""
+
+    def test_gutenberg_image_block(self) -> None:
+        out = adapters.get("gutenberg")(_doc(_IMG))
+        self.assertIn("<!-- wp:image", out)
+        self.assertIn('"id":7', out)
+        self.assertIn("wp-image-7", out)
+        self.assertIn('src="https://example.test/wp-content/uploads/a.jpg"', out)
+        self.assertIn('alt="Alt &quot;q&quot; &amp; &lt;co&gt;"', out)
+
+    def test_classic_image_block(self) -> None:
+        out = adapters.get("classic")(_doc(_IMG))
+        self.assertIn('<img src="https://example.test/wp-content/uploads/a.jpg"', out)
+        self.assertIn('alt="Alt &quot;q&quot; &amp; &lt;co&gt;"', out)
+
+    def test_elementor_image_widget_and_fallback(self) -> None:
+        envelope = json.loads(adapters.get("elementor")(_doc(_IMG)))
+        self.assertIn("<img", envelope["content"])
+        data = json.loads(envelope["meta"]["_elementor_data"])
+        widget = data[0]["elements"][0]["elements"][0]
+        self.assertEqual(widget["widgetType"], "image")
+        self.assertEqual(
+            widget["settings"]["image"]["url"],
+            "https://example.test/wp-content/uploads/a.jpg",
+        )
+        self.assertEqual(widget["settings"]["image"]["id"], 7)
+
+    def test_unresolved_image_renders_nothing(self) -> None:
+        # An image block with no uploaded media_url must not emit a broken <img>.
+        for editor in ("gutenberg", "classic", "elementor"):
+            out = adapters.get(editor)(_doc(Block(kind="image", alt="x")))
+            self.assertNotIn("<img", out)
 
 
 if __name__ == "__main__":

@@ -33,6 +33,15 @@ def _escape_text(text: str) -> str:
     return _BARE_AMP.sub("&amp;", text).replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _escape_attr(text: str) -> str:
+    """Escape a value for a double-quoted HTML attribute (image alt / src).
+
+    Text-span rules plus the double-quote, since the value sits inside `"..."`.
+    Bare `&` only, so an already-encoded entity is never doubled.
+    """
+    return _escape_text(text).replace('"', "&quot;")
+
+
 def escape_inline(text: str) -> str:
     """Escape literal text spans but leave recognized inline HTML tags intact."""
     out: list[str] = []
