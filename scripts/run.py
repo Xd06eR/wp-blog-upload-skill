@@ -12,7 +12,8 @@ Subcommands:
     list-briefs       Pre-scan a markdown brief for embedded client sections
     inspect-brief     Dump every table + heading found in a brief (debug aid
                       when list-briefs returns empty / strict parser fails)
-    upload            Upload one brief from a .md file as a WP draft
+    upload            Upload one brief (.docx/.md) as a WP draft; --media-dir
+                      also uploads a folder of images (first = featured)
     upload-prepared   Upload from an agent-emitted JSON payload (bypasses
                       the markdown parser entirely)
 """
@@ -58,6 +59,9 @@ def main(argv: list[str] | None = None) -> int:
     p_upload.add_argument("--doc", required=True, help="Path to .md brief.")
     p_upload.add_argument("--brand", default=None,
                           help="Section name inside a multi-brief markdown file (case insensitive).")
+    p_upload.add_argument("--media-dir", default=None,
+                          help="Folder of image files to upload and append to the body "
+                               "(name-sorted; the first becomes the featured image).")
 
     p_prepared = sub.add_parser("upload-prepared",
                                 help="Upload from a pre-parsed JSON payload (agent-emitted ParsedDoc).")
@@ -265,10 +269,15 @@ def _run_upload(args) -> int:
         return 2
 
     try:
-        result = upload_blog(doc_path=doc_path, client_cfg=cfg, brand=args.brand)
+        result = upload_blog(
+            doc_path=doc_path, client_cfg=cfg, brand=args.brand, media_dir=args.media_dir
+        )
     except parse_md.ParseError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
+    except ValueError as e:  # bad --media-dir (not a directory)
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
     except Exception as e:
         print(f"ERROR: upload failed -- {type(e).__name__}: {e}", file=sys.stderr)
         return 1
@@ -280,6 +289,7 @@ def _run_upload(args) -> int:
         "edit_url": result.edit_url,
         "brand": result.brand,
         "warnings": result.warnings,
+        "media": result.media,
     }, indent=2))
     return 0
 
@@ -325,6 +335,7 @@ def _run_upload_prepared(args) -> int:
         "edit_url": result.edit_url,
         "brand": result.brand,
         "warnings": result.warnings,
+        "media": result.media,
     }, indent=2))
     return 0
 
