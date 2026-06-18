@@ -63,22 +63,39 @@ class SlugCollisionTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
-        self._canon = mock.patch.object(
-            workspace, "_canonical_workspace",
-            return_value=Path(self._tmp.name) / "blog-upload-workspace",
-        )
-        self._canon.start()
+        ws = Path(self._tmp.name) / "blog-upload-workspace"
+        # Patch root()/find() directly, NOT just _canonical_workspace: root()
+        # searches downward then upward BEFORE the canonical fallback, so running
+        # the suite from a directory at/above the real workspace would otherwise
+        # resolve to it and write these test clients into the live secrets dir +
+        # clients.db. Pinning root() forces every workspace path into the temp dir.
+        self._root = mock.patch.object(workspace, "root", return_value=ws)
+        self._find = mock.patch.object(workspace, "find", return_value=ws)
+        self._root.start()
+        self._find.start()
+        # client_store memoizes a singleton keyed by db_path; clear it so this
+        # test binds to the temp DB (and the next test isn't left on a stale one).
+        import scripts.tools.client_store as client_store
+        client_store._store = None
+        self._client_store = client_store
         # stub the network: login ok, gutenberg detected
         self._login = mock.patch.object(onboarding, "_verify_login", return_value="Site")
         self._login.start()
         self._probe = mock.patch.object(
             onboarding, "detect_editor", return_value=("gutenberg", True))
         self._probe.start()
+        # Materialize the temp workspace skeleton up-front so register_client's
+        # ensure() is a no-op for .env.example. The write-failure test patches
+        # Path.write_text and must intercept ONLY the credential write, not the
+        # skeleton bootstrap (the old code leaned on the real workspace existing).
+        workspace.ensure()
 
     def tearDown(self) -> None:
         self._probe.stop()
         self._login.stop()
-        self._canon.stop()
+        self._find.stop()
+        self._root.stop()
+        self._client_store._store = None
         self._tmp.cleanup()
 
     def _onboard(self, slug, site_url):
