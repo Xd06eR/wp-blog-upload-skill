@@ -10,7 +10,7 @@ REST.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -18,12 +18,12 @@ from . import adapters
 from .tools import parse_md
 from .tools.client_config import ClientConfig
 from .tools.parse_md import Block, Brief, ParsedDoc
-from .tools.wp_client import WPClient, WPCredentials
+from .tools.wp_client import WPClient, WPCredentials, WPError
 
 __all__ = ["ClientConfig", "UploadResult", "upload_blog", "upload_prepared"]
 
 
-_ALLOWED_BLOCK_KINDS = {"h1", "h2", "h3", "h4", "paragraph", "list", "table"}
+_ALLOWED_BLOCK_KINDS = {"h1", "h2", "h3", "h4", "paragraph", "list", "table", "image"}
 
 
 @dataclass
@@ -34,6 +34,7 @@ class UploadResult:
     edit_url: str
     brand: str = ""
     warnings: list[str] = field(default_factory=list)
+    media: list[dict] = field(default_factory=list)
 
 
 # A keyword longer than this is almost certainly an un-delimited blob (e.g. a
@@ -47,10 +48,17 @@ def upload_blog(
     client_cfg: ClientConfig,
     *,
     brand: str | None = None,
+    media_dir: str | Path | None = None,
 ) -> UploadResult:
-    """Parse the brief (.docx or .md, auto-detected), render, create a WP draft."""
+    """Parse the brief (.docx or .md, auto-detected), render, create a WP draft.
+
+    When `media_dir` is given, every image file in that folder is uploaded and
+    appended to the body (name-sorted); the first becomes the featured image.
+    """
     from .tools.intake import parser_for
     doc = parser_for(doc_path).parse(doc_path, brand=brand)
+    if media_dir:
+        doc = replace(doc, body=[*doc.body, *_media_dir_blocks(media_dir)])
     return _post_parsed_doc(doc, client_cfg)
 
 
@@ -134,6 +142,11 @@ def _payload_to_parsed_doc(payload: dict) -> ParsedDoc:
             if not isinstance(items, list):
                 raise ValueError(f"payload.body[{i}].items must be an array of strings")
             blocks.append(Block(kind="list", items=[str(x) for x in items if str(x).strip()]))
+        elif kind == "image":
+            src = str(block_in.get("src", "")).strip()
+            if not src:
+                raise ValueError(f"payload.body[{i}] image block requires 'src' (local file path)")
+            blocks.append(Block(kind="image", src=src, alt=str(block_in.get("alt", "")).strip()))
         else:
             blocks.append(Block(kind=kind, text=str(block_in.get("text", "")).strip()))
 
@@ -158,12 +171,57 @@ def _apply_title_template(template: str, h1: str) -> str:
         return h1
 
 
+_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
+
+def _media_dir_blocks(media_dir: str | Path) -> list[Block]:
+    """Build image blocks from every image file in `media_dir`, name-sorted.
+
+    The --media-dir convenience path: the brief carries no image placement, so
+    the files are appended to the body in filename order. The filename stem is a
+    placeholder alt -- the operator refines it in WP admin.
+    """
+    d = Path(media_dir).expanduser()
+    if not d.is_dir():
+        raise ValueError(f"--media-dir is not a directory: {d}")
+    files = sorted(p for p in d.iterdir() if p.is_file() and p.suffix.lower() in _IMAGE_EXTS)
+    return [Block(kind="image", src=str(p), alt=p.stem) for p in files]
+
+
+def _resolve_media(doc: ParsedDoc, wp: WPClient, warnings: list[str]) -> tuple[ParsedDoc, int]:
+    """Upload each image block's file, filling media_id / media_url.
+
+    Returns (resolved_doc, featured_media_id). The first image that uploads
+    successfully becomes the featured image. A per-image failure is recorded as a
+    warning and that block is dropped -- one bad image must never sink the whole
+    post; the rest of the body still publishes as a draft.
+    """
+    featured = 0
+    new_body: list[Block] = []
+    for block in doc.body:
+        if block.kind == "image" and block.src and not block.media_id:
+            try:
+                media = wp.upload_media(block.src, alt_text=block.alt)
+            except (WPError, OSError) as e:
+                warnings.append(f"Image upload failed for {Path(block.src).name}: {e}")
+                continue  # drop the unrenderable block
+            media_id = int(media.get("id", 0) or 0)
+            block = replace(block, media_id=media_id, media_url=media.get("source_url", ""))
+            if not featured and media_id:
+                featured = media_id
+        new_body.append(block)
+    return replace(doc, body=new_body), featured
+
+
 def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
     warnings: list[str] = []
     title = _apply_title_template(client_cfg.title_template, doc.title or "Untitled")
 
     creds = WPCredentials.load(client_cfg.wp_credentials_path)
     wp = WPClient(creds)
+
+    # Upload images first so the rendered body references the WP media URLs.
+    doc, featured_media = _resolve_media(doc, wp, warnings)
 
     if not doc.body:
         warnings.append("Brief produced an empty body — the draft has no content.")
@@ -176,6 +234,8 @@ def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
         "content": content,
         "status": "draft",
     }
+    if featured_media:
+        payload["featured_media"] = featured_media
 
     if client_cfg.default_category:
         cat_id = wp.find_category_id(client_cfg.default_category)
@@ -198,6 +258,8 @@ def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
 
     post = wp.create_post(payload)
 
+    media = [{"id": b.media_id, "url": b.media_url}
+             for b in doc.body if b.kind == "image" and b.media_id]
     return UploadResult(
         title=title,
         post_id=post["id"],
@@ -205,6 +267,7 @@ def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
         edit_url=f"{creds.site_base}/wp-admin/post.php?post={post['id']}&action=edit",
         brand=doc.brand,
         warnings=warnings,
+        media=media,
     )
 
 

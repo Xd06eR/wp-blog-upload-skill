@@ -52,11 +52,18 @@ class Brief:
 
 @dataclass
 class Block:
-    """One body element. kind is heading / paragraph / list / table."""
-    kind: str  # 'h1' | 'h2' | 'h3' | 'h4' | 'paragraph' | 'list' | 'table'
+    """One body element. kind is heading / paragraph / list / table / image."""
+    kind: str  # 'h1' | 'h2' | 'h3' | 'h4' | 'paragraph' | 'list' | 'table' | 'image'
     text: str = ""
     items: list[str] = field(default_factory=list)
     rows: list[list[str]] = field(default_factory=list)  # table: row-major cell HTML
+    # image blocks: `src` is a local file path to upload. The orchestrator
+    # uploads it via the WP client and fills media_id / media_url; the adapters
+    # then render an <img> / wp:image referencing the uploaded media.
+    src: str = ""
+    alt: str = ""
+    media_id: int = 0
+    media_url: str = ""
 
 
 @dataclass
