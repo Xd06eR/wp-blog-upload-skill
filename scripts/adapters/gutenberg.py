@@ -9,7 +9,7 @@ fields after the upload (those plugins do NOT support REST).
 from __future__ import annotations
 
 from ..tools.parse_md import Block, ParsedDoc
-from ._escape import escape_inline
+from ._escape import build_todo_meta, escape_inline
 
 
 def render(doc: ParsedDoc) -> str:
@@ -82,13 +82,4 @@ def _table_block(rows: list[list[str]]) -> str:
 
 
 def _todo_meta_comment(doc: ParsedDoc) -> str:
-    keywords = ", ".join(doc.brief.keywords) if doc.brief.keywords else "(none)"
-    return (
-        "<!-- TODO META FOR HUMAN:\n"
-        "  - Fill SEO title + meta description in Yoast / RankMath / AIOSEO (no REST API)\n"
-        f"  - Meta title (suggested): {doc.brief.meta_title or '(none)'}\n"
-        f"  - Meta description (suggested): {doc.brief.meta_description or '(none)'}\n"
-        f"  - Target URL: {doc.brief.page_url or '(not specified)'}\n"
-        f"  - Keywords: {keywords}\n"
-        "-->"
-    )
+    return build_todo_meta(doc.brief)

@@ -43,3 +43,36 @@ def escape_inline(text: str) -> str:
         last = m.end()
     out.append(_escape_text(text[last:]))
     return "".join(out)
+
+
+def comment_safe(text: str) -> str:
+    """Neutralize a field interpolated into an HTML comment.
+
+    A meta title / description containing ``-->`` (or a Word em-dash artifact
+    that normalizes to ``--`` before a ``>``) would otherwise close the hidden
+    ``<!-- TODO META ... -->`` block early and leak the remaining fields into
+    the visible draft body. Inserting an en-dash between the dashes and the
+    angle bracket keeps the note hidden while staying readable.
+    """
+    return text.replace("-->", "--–>") if text else text
+
+
+def build_todo_meta(brief, *, extra_lines: tuple[str, ...] = ()) -> str:
+    """The hidden ``<!-- TODO META FOR HUMAN -->`` note shared by all adapters.
+
+    Reminds the writer to fill Yoast / RankMath / AIOSEO by hand (those plugins
+    have no REST API). Every interpolated field is run through ``comment_safe``
+    so a stray ``-->`` cannot break out of the comment.
+    """
+    keywords = ", ".join(brief.keywords) if brief.keywords else "(none)"
+    lines = [
+        "<!-- TODO META FOR HUMAN:",
+        "  - Fill SEO title + meta description in Yoast / RankMath / AIOSEO (no REST API)",
+        f"  - Meta title (suggested): {comment_safe(brief.meta_title) or '(none)'}",
+        f"  - Meta description (suggested): {comment_safe(brief.meta_description) or '(none)'}",
+        f"  - Target URL: {comment_safe(brief.page_url) or '(not specified)'}",
+        f"  - Keywords: {comment_safe(keywords)}",
+        *(f"  {line}" for line in extra_lines),
+        "-->",
+    ]
+    return "\n".join(lines)
