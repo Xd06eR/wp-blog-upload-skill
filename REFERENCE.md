@@ -20,11 +20,12 @@ That is the entire UX. No preview, no diff, no approval gate. The upload is inte
 | In scope | Out of scope |
 |---|---|
 | Parse `.docx` or `.md` brief (single or multi-client) | Content generation |
-| Pick the right registered client | Image upload (text-only) |
+| Pick the right registered client | Image *generation* / editing / resizing |
 | Render body to Gutenberg / Classic / Elementor | Internal-link injection |
-| POST to WP REST `/wp/v2/posts` as `status=draft` | Yoast / RankMath meta (no REST support) |
-| Onboard a new client when credentials are provided | Updating existing posts |
-| Per-client playbook (agent memory) | Auto-publish |
+| Upload images + set the first as the featured image | Yoast / RankMath meta (no REST support) |
+| POST to WP REST `/wp/v2/posts` as `status=draft` | Updating existing posts |
+| Onboard a new client when credentials are provided | Auto-publish |
+| Per-client playbook (agent memory) | |
 
 If the user asks for anything outside scope, tell them clearly and stop. Do not try to extend the skill in-session.
 
@@ -59,6 +60,15 @@ This shape **parses natively from `.docx`** — the reader walks the field table
 ### Translation / multi-body `.docx`
 
 A translation brief packs one topic's ZH original plus its EN "TRANSLATED VERSION" into a single `.docx` as two separate bodies. Each body is selected with `--brand`, using the label that `list-briefs` reports for it.
+
+### Images
+
+Briefs rarely carry machine-placeable images — the files usually arrive separately (e.g. a Drive folder of numbered images) with no "insert here" markers. Two paths upload them:
+
+- **Folder (`--media-dir`):** point `upload` at a folder; every image file (`.jpg/.jpeg/.png/.gif/.webp`) is uploaded to the WP media library in filename order, appended to the body, and the **first becomes the post's featured image**. The filename stem is used as a placeholder `alt` — the writer refines alt text + final placement in WP admin.
+- **Inline (`upload-prepared`):** when you *do* know placement, put `{"kind": "image", "src": "/abs/path.jpg", "alt": "..."}` blocks directly in the `body[]` array (see "ParsedDoc JSON schema"); each is uploaded and rendered in place.
+
+Either way the skill **uploads** existing image files — it never generates, edits, or resizes them. A per-image upload failure is a warning, not a fatal error: the rest of the draft still posts.
 
 ### Markdown shapes
 
@@ -125,7 +135,7 @@ All commands run with `PYTHONPATH=<skill-dir> python3 -B -m scripts.run`, where 
 | `onboard --from-file <path> [--slug <slug>]` | Verify creds against WP, write `<slug>.json`, insert client row, delete pending file. `--slug` overrides the slug auto-derived from the site URL (use it to resolve a slug collision) | Human readable |
 | `list-briefs --doc <path>` | Pre-scan a `.docx` or `.md` brief for client / body sections (strict parser; auto-detected by extension) | JSON: `[{brand, page_url, h1, word_count}, ...]` |
 | `inspect-brief --doc <path.md>` | Dump every table + heading + counts in a **markdown** brief (debug aid when strict parser returns `[]`). Markdown-only — refuses `.docx` (a `.docx` parses natively, so there is nothing to inspect) | JSON: `{section_headers, tables, headings, paragraph_count, list_count}` |
-| `upload --client <slug> --doc <path> [--brand <name>]` | Parse + render + POST as draft (`.docx` / `.md` auto-detected) | JSON: `{title, post_id, post_url, edit_url, brand, warnings}` |
+| `upload --client <slug> --doc <path> [--brand <name>] [--media-dir <dir>]` | Parse + render + POST as draft (`.docx` / `.md` auto-detected). `--media-dir` uploads every image in the folder (name-sorted), appends them to the body, and sets the first as the featured image | JSON: `{title, post_id, post_url, edit_url, brand, warnings, media}` |
 | `upload-prepared --client <slug> --from-file <payload.json>` | Render + POST from agent-emitted ParsedDoc JSON (bypasses the brief parser) | Same as `upload` |
 
 `.docx` briefs are parsed natively — there is no normalize step, and `inspect-brief` does not apply to them. `warnings` is an array of non-fatal advisories (empty-body, skipped over-long keyword, defaulted-editor); empty when the run was clean.
@@ -185,7 +195,8 @@ The brief body has already been approved by the writer. The agent's job is *stru
     {"kind": "h3", "text": "Sub-heading"},
     {"kind": "paragraph", "text": "Body prose copied verbatim from the source brief ..."},
     {"kind": "list", "items": ["Item one", "Item two"]},
-    {"kind": "table", "rows": [["Header one", "Header two"], ["Cell A", "Cell B"]]}
+    {"kind": "table", "rows": [["Header one", "Header two"], ["Cell A", "Cell B"]]},
+    {"kind": "image", "src": "/abs/path/to/photo.jpg", "alt": "descriptive alt text"}
   ]
 }
 ```
@@ -201,12 +212,14 @@ The brief body has already been approved by the writer. The agent's job is *stru
 | `brief.word_count` | no | Informational |
 | `brief.keywords` | recommended | Sent to WP as post tags (merged with the client's `default_tags`) via `find_or_create_tag`; an over-long blob (>50 chars) is skipped as a tag at upload (with a warning) to avoid junk WP tags |
 | `brief.target_audience` | no | Informational |
-| `body[].kind` | **yes** | One of `h1`, `h2`, `h3`, `h4`, `paragraph`, `list`, `table` |
+| `body[].kind` | **yes** | One of `h1`, `h2`, `h3`, `h4`, `paragraph`, `list`, `table`, `image` |
 | `body[].text` | required when kind is a heading or `paragraph` | May contain inline HTML (`<a>`, `<strong>`) |
 | `body[].items` | required when kind == `list` | Array of strings; empty entries dropped |
 | `body[].rows` | required when kind == `table` | Array of rows, each an array of cell-HTML strings; renders as a real `<table>` |
+| `body[].src` | required when kind == `image` | Local file path; uploaded to the WP media library at POST time. The first image in the body becomes the post's `featured_media` |
+| `body[].alt` | optional (image) | Alt text; defaults to empty |
 
-The CLI validates the shape and exits `2` on missing required fields or unknown `kind` values. Body `h1` blocks are demoted to `<h2>` by the adapters because WP already uses the post title as `<h1>`. On success the `UploadResult` (stdout JSON) carries a `warnings` array — non-fatal advisories such as an empty body or skipped over-long keyword; empty on a clean run.
+The CLI validates the shape and exits `2` on missing required fields or unknown `kind` values. Body `h1` blocks are demoted to `<h2>` by the adapters because WP already uses the post title as `<h1>`. On success the `UploadResult` (stdout JSON) carries a `warnings` array — non-fatal advisories such as an empty body or skipped over-long keyword; empty on a clean run. Image blocks are uploaded to the WP media library at POST time; the result JSON also carries a `media` array of the uploaded `{id, url}` and the first image is set as `featured_media`.
 
 ## Onboarding flow
 
@@ -234,14 +247,15 @@ Three built-in adapters in `scripts/adapters/`:
 
 | Editor | Output |
 |---|---|
-| `gutenberg` | HTML wrapped in `<!-- wp:heading -->`, `<!-- wp:paragraph -->`, `<!-- wp:list -->` block comments. List items each get their own `<!-- wp:list-item -->` wrapper (WP 6.0+ flags a bare `<li>`), and `table` blocks render as a `<!-- wp:table -->` `<figure class="wp-block-table"><table>...</table></figure>` |
-| `classic` | Plain HTML `<h2>`, `<p>`, `<ul>`, and a real `<table>` for `table` blocks |
-| `elementor` | JSON envelope: `{"content": "<plain html fallback>", "meta": {"_elementor_data": "[...]", ...}}` — `upload_blog.py` splits envelope into `content` field + extra `meta` |
+| `gutenberg` | HTML wrapped in `<!-- wp:heading -->`, `<!-- wp:paragraph -->`, `<!-- wp:list -->` block comments. List items each get their own `<!-- wp:list-item -->` wrapper (WP 6.0+ flags a bare `<li>`), `table` blocks render as a `<!-- wp:table -->` `<figure class="wp-block-table"><table>...</table></figure>`, and `image` blocks as `<!-- wp:image {"id":N} --><figure class="wp-block-image"><img .../></figure>` |
+| `classic` | Plain HTML `<h2>`, `<p>`, `<ul>`, a real `<table>` for `table` blocks, and `<figure><img></figure>` for `image` blocks |
+| `elementor` | JSON envelope: `{"content": "<plain html fallback>", "meta": {"_elementor_data": "[...]", ...}}` — `upload_blog.py` splits envelope into `content` field + extra `meta`. `image` blocks become an Elementor `image` widget (URL + media id), with an `<img>` in the HTML fallback |
 
 All three:
 
 - Demote any body `<h1>` to `<h2>` (the post title is already H1 in WP)
 - Render in-body `table` blocks as real `<table>` markup (not flattened text)
+- Render `image` blocks as the editor's native image markup (Gutenberg `wp:image`, Classic/Elementor `<figure><img>`), referencing the file's WP media URL + id after upload; the first image in the body is set as the post's `featured_media`
 - Inject a hidden `<!-- TODO META FOR HUMAN: ... -->` comment at the top with the meta title, meta description, target URL, and keywords from the brief (Elementor adds a layout-check note), so the writer remembers to fill Yoast / RankMath. Fields interpolated into that comment are injection-safe: a literal `-->` in a value is neutralized so it can't close the comment early
 - Escape literal text spans while preserving recognized inline tags — the inline `<a>` / `<strong>` from the parsers pass through, and only the text between them is `html.escape`-d
 
@@ -315,6 +329,8 @@ Entries are dated `## YYYY-MM-DD — headline`. The live file holds the most rec
 | `WordPress rejected the username + application password` (onboarding) / `WordPress refused to <action> (HTTP 401)` (upload) | App password wrong / user lacks role | Re-onboard the client (delete `<slug>.json`, copy `.env.example` again) |
 | Onboarding errors on a slug collision (a different client already derives this slug) | Two clients map to the same auto-derived slug | Re-run `onboard` with an explicit `--slug <slug>` |
 | Upload fails loud on an empty body / missing H1 | Brief parsed to no body content (e.g. an `.md` export of a body-in-a-table brief where the export may have flattened the body cell) | Use the `.docx` instead; if markdown-only, normalize it (Route A) or emit ParsedDoc JSON (Route B) so the body is populated |
+| `warnings` includes `Image upload failed for <file>` | Image file missing/unreadable, or WP rejected it (size / MIME / media permissions) | Confirm the file exists and the WP user can upload media, then re-run; the draft still posts without that image |
+| `ERROR: --media-dir is not a directory: <path>` | `--media-dir` pointed at a missing folder or a file | Pass the folder that holds the image files |
 | `ERROR: ... No adapter for editor '<x>'` | New editor type detected | Check `clients.editor` value — skill ships gutenberg / classic / elementor only |
 | Upload succeeds but the draft body looks empty | Editor mismatch | Open in WP admin, check whether it expects Gutenberg blocks or classic HTML, update `clients.editor` |
 

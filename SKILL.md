@@ -1,6 +1,6 @@
 ---
 name: blog-upload
-description: Upload a new WordPress blog draft from a brief the operator drops into the workspace. Accepts both Word `.docx` and markdown `.md` (auto-detected) — `.docx` is the safer default, since some briefs wrap the article body in a table cell that markdown export can flatten. AI parses the brief (single, multi-client, or translation format), picks the right client by name, and POSTs straight to WordPress as a draft. Auto-creates the workspace folder on first use. Pure stdlib, no pip install. Yoast / RankMath meta is filled by hand afterwards. Use when the user wants to upload a new SEO blog post to a client WordPress site from a `.docx` or `.md` brief.
+description: Upload a new WordPress blog draft from a brief the operator drops into the workspace. Accepts both Word `.docx` and markdown `.md` (auto-detected) — `.docx` is the safer default, since some briefs wrap the article body in a table cell that markdown export can flatten. AI parses the brief (single, multi-client, or translation format), picks the right client by name, and POSTs straight to WordPress as a draft. Auto-creates the workspace folder on first use. Pure stdlib, no pip install. Yoast / RankMath meta is filled by hand afterwards. Optionally uploads the brief's images from a folder and sets the first as the featured image. Use when the user wants to upload a new SEO blog post to a client WordPress site from a `.docx` or `.md` brief.
 ---
 
 # Blog Upload (WordPress)
@@ -178,7 +178,18 @@ PYTHONPATH=<skill-dir> python3 -B -m scripts.run upload \
 
 Drop `--brand` if the file has a single section. Stdout includes a `warnings` array — **surface any warnings to the operator** (e.g. "empty body", "skipped over-long keyword", a defaulted editor). An empty-body or missing-H1 brief fails with a clear error rather than posting a blank draft.
 
-Stdout is JSON `{title, post_id, post_url, edit_url, brand}`. Capture it and report to the operator:
+**Images (optional).** If the operator also provides image files (commonly a separate folder — briefs rarely embed placeable images), add `--media-dir` to upload them. Every image in the folder is uploaded in filename order, appended to the body, and the **first becomes the featured image**:
+
+```bash
+PYTHONPATH=<skill-dir> python3 -B -m scripts.run upload \
+  --client <SLUG> \
+  --doc $WS/briefs/upload/FILENAME.docx \
+  --media-dir $WS/briefs/upload/<image-folder>
+```
+
+The filename stem is a placeholder `alt` — tell the operator to refine alt text + final placement in WP admin. A per-image failure is a warning (surfaced in `warnings`), not a fatal error. When you already know exact placement, put `image` blocks in an `upload-prepared` payload instead (see REFERENCE.md).
+
+Stdout is JSON `{title, post_id, post_url, edit_url, brand, warnings, media}` (`media` lists the uploaded images). Capture it and report to the operator:
 
 > Draft created: **<title>**
 > Edit URL: `<edit_url>`

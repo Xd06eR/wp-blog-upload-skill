@@ -6,6 +6,7 @@ What the tool does for you:
 - Reads your blog brief (a Word `.docx` file — or a Markdown `.md` file).
 - Picks the right client — and if it's a **new** client, walks you through setting it up.
 - Creates a **draft** post on WordPress (it never publishes — you do that yourself).
+- Uploads your blog's images (just give it the image folder) and sets the first one as the featured image.
 
 **What you normally tell it:** the **client name** + the **brief file**. That's all. The agent asks you for anything else it needs (which section to use, a missing login, etc.).
 
@@ -40,6 +41,7 @@ Each prompt pairs plain English with the exact command, so the agent acts reliab
 > `@blog-upload` upload `@‹your-brief.docx›` for `‹Client Name›`
 
 > - The skill always uploads as a **draft** and gives you back the draft link — you don't need to ask for either.
+> - **Got images?** Put them in a folder and mention it ("…the images are in this folder"). The agent uploads them and makes the first one the featured image.
 > - If the file has sections for several clients, the agent shows the list and asks which one.
 > - If the client is new, the agent notices and walks you through adding it (it asks you for the WordPress site address, username, and an application password).
 
@@ -94,7 +96,7 @@ Your brief's wording is always copied **word-for-word** — the agent never rewr
 
 Open the **edit link** the agent gives you, then in WP admin:
 1. Fill the **Yoast / RankMath meta title + description** (these can't be set automatically — do it by hand).
-2. Add a featured image, internal links, etc.
+2. Check the images — the agent uploads any you gave it and sets the first as the featured image; adjust the order or pick a different featured image if you like. Add internal links, etc.
 3. When happy, hit **Publish** yourself.
 
 🎉 Done.
