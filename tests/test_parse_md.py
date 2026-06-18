@@ -105,6 +105,59 @@ More body.
 """
 
 
+class KeywordCleanerTest(unittest.TestCase):
+    """H7: keyword cell -> clean list (label, volumes, separators)."""
+
+    def test_strips_blog_keywords_label(self) -> None:
+        self.assertEqual(parse_md.clean_keywords("Blog Keywords: alpha, beta"), ["alpha", "beta"])
+
+    def test_drops_search_volume_integers(self) -> None:
+        out = parse_md.clean_keywords("part time mba hong kong 70, hk mba 10")
+        self.assertEqual(out, ["part time mba hong kong", "hk mba"])
+
+    def test_keeps_cjk_phrase_with_spaces_intact(self) -> None:
+        # whitespace is NOT a separator -- a comma-less CJK cell stays one phrase.
+        self.assertEqual(parse_md.clean_keywords("中西式 婚禮"), ["中西式 婚禮"])
+
+    def test_splits_on_comma_semicolon_newline(self) -> None:
+        self.assertEqual(parse_md.clean_keywords("a, b; c\nd"), ["a", "b", "c", "d"])
+
+
+class StripInlineMdTest(unittest.TestCase):
+    """M8: global bold strip, not a single outer pair."""
+
+    def test_two_bold_runs(self) -> None:
+        self.assertEqual(parse_md._strip_inline_md("**a** and **b**"), "a and b")
+
+    def test_bold_italic(self) -> None:
+        self.assertEqual(parse_md._strip_inline_md("***x***"), "x")
+
+
+class LinkParenTest(unittest.TestCase):
+    """M9: URL containing balanced parens is not truncated."""
+
+    def test_paren_url_survives(self) -> None:
+        out = parse_md._convert_inline("see [doc](https://x.com/a_(b)_c) now")
+        self.assertIn('href="https://x.com/a_(b)_c"', out)
+
+
+class BrandHeaderHashTest(unittest.TestCase):
+    """H8: a brand header after a stray empty `### ` keeps a clean name."""
+
+    def test_hash_not_pulled_into_brand_name(self) -> None:
+        text = "### \n\n### KitchenPark (AR)\n\n| Content Topic | x |\n| :- | :- |\n| **URL** | u |\n"
+        names = [b.brand for b in parse_md.list_briefs(_tmp_md(text))]
+        self.assertIn("KitchenPark (AR)", names)
+        self.assertNotIn("### KitchenPark (AR)", names)
+
+
+def _tmp_md(text: str) -> str:
+    t = tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8")
+    t.write(text)
+    t.close()
+    return t.name
+
+
 class HeadingVariantTest(unittest.TestCase):
     """B1: heading detection across colon / full-width / period / hash forms."""
 

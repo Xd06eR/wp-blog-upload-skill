@@ -37,7 +37,7 @@ from pathlib import Path
 
 from . import docx_reader
 from .parse_md import (
-    Block, Brief, BriefSummary, ParseError, ParsedDoc, _convert_inline,
+    Block, Brief, BriefSummary, ParseError, ParsedDoc, clean_keywords, _convert_inline,
     _HEADING_LINE as _HEADING_RE,
 )
 
@@ -112,6 +112,8 @@ def _extract_brief(doc: docx_reader.Document) -> Brief:
             brief.meta_title = _value_cell_text(table)
         elif kind == "meta_description":
             brief.meta_description = _value_cell_text(table)
+        elif kind == "keywords":
+            brief.keywords = clean_keywords(_value_cell_text(table))
         elif kind == "page_url_grid":
             # rows[0] = headers (Page URL | Page Type | Word Count),
             # rows[1] = data. The URL cell often holds the topic or is blank,
@@ -124,7 +126,6 @@ def _extract_brief(doc: docx_reader.Document) -> Brief:
                     brief.word_count = data[-1].text.strip()
     if not brief.page_url:
         brief.page_url = _find_kv(doc, "client url", "client")
-    # keywords are populated by the shared keyword cleaner (B2).
     return brief
 
 
@@ -204,6 +205,8 @@ def _brief_from_field_tables(tables: list[docx_reader.Table]) -> Brief:
             brief.meta_title = _value_cell_text(table)
         elif kind == "meta_description":
             brief.meta_description = _value_cell_text(table)
+        elif kind == "keywords":
+            brief.keywords = clean_keywords(_value_cell_text(table))
         elif kind == "page_url_grid" and len(table.rows) >= 2:
             data = table.rows[-1]
             if data and data[0].text.startswith("http"):

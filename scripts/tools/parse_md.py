@@ -90,8 +90,11 @@ class ParseError(Exception):
 #   ### **Acme Catering**
 # Skips link-only H3s like `### [**https://...**](https://...)` because
 # `[` is excluded from the captured group.
+# `#` is excluded from the captured name so a brand header preceded by a stray
+# empty `### ` line can't pull the leftover hashes into the name (the bug that
+# produced a brand literally called `### KitchenPark (AR)`).
 _CLIENT_HEADER = re.compile(
-    r"^###\s+(?:\*\*\s*([^\[\]\n*]+?)\s*\*\*|([^\[\]\n*][^\[\]\n*]*?))\s*$",
+    r"^###\s+(?:\*\*\s*([^\[\]\n*#]+?)\s*\*\*|([^\[\]\n*#][^\[\]\n*#]*?))\s*$",
     re.MULTILINE,
 )
 
@@ -170,12 +173,41 @@ def _unescape_md(s: str) -> str:
 
 
 def _strip_inline_md(text: str) -> str:
-    """Drop markdown bold/escape noise from a cell value."""
-    s = text.strip()
-    if s.startswith("**") and s.endswith("**") and len(s) >= 4:
-        s = s[2:-2].strip()
+    """Drop markdown bold/escape noise from a cell value.
+
+    Strips ALL ``**...**`` bold runs, not just a single outer pair, so a cell
+    like ``**a** and **b**`` becomes ``a and b`` instead of the corrupted
+    ``a** and **b``. ``***x***`` collapses cleanly too.
+    """
+    s = _BOLD_RE.sub(r"\1", text.strip())
+    s = _ITALIC_RE.sub(r"\1", s)  # peel any remaining *italic* (e.g. from ***bold-italic***)
     s = _unescape_md(s)
     return s.strip()
+
+
+# A leading label some writers leave inside the keyword cell value itself
+# ("Blog Keywords: ...", "Keywords: ..."). Stripped so it doesn't become part
+# of the first keyword.
+_KEYWORD_LABEL = re.compile(r"^\s*(?:blog\s+)?keywords?\b[^:：]*[:：]\s*", re.IGNORECASE)
+
+
+def clean_keywords(value: str) -> list[str]:
+    """Parse a keyword cell into a clean list, shared by both intake paths.
+
+    Handles the real Google-Docs shapes: a leading ``Blog Keywords:`` label,
+    search-volume integers sprinkled between phrases (``... hong kong 70 ...``),
+    and comma / semicolon / newline separation. Whitespace is deliberately NOT
+    treated as a separator -- CJK cells are space-separated and phrases contain
+    spaces, so splitting on it would shatter real phrases into fragments.
+    """
+    value = _KEYWORD_LABEL.sub("", value)
+    out: list[str] = []
+    for part in re.split(r"[,;\n]", value):
+        part = re.sub(r"\b\d+\b", " ", part)   # drop bare search-volume integers
+        part = " ".join(part.split())
+        if part:
+            out.append(part)
+    return out
 
 
 def _parse_table(lines: list[str]) -> tuple[Brief, int]:
@@ -216,7 +248,7 @@ def _parse_table(lines: list[str]) -> tuple[Brief, int]:
 
         target = _FIELD_ALIASES.get(key_raw)
         if target == "keywords":
-            brief.keywords = [k.strip() for k in re.split(r"[,;\n]", value) if k.strip()]
+            brief.keywords = clean_keywords(value)
         elif target:
             setattr(brief, target, value)
         i += 1
@@ -226,8 +258,12 @@ def _parse_table(lines: list[str]) -> tuple[Brief, int]:
     return brief, i
 
 
-_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+# The href allows one level of balanced parentheses so URLs that legitimately
+# contain them (e.g. a Wikipedia or tracking link ending in `(margin)`) are not
+# truncated at the first `)`.
+_LINK_RE = re.compile(r"\[([^\]]+)\]\(((?:[^()]|\([^()]*\))*)\)")
 _BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
+_ITALIC_RE = re.compile(r"\*([^*]+)\*")
 
 
 def _convert_inline(text: str) -> str:
