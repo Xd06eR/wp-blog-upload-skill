@@ -16,12 +16,12 @@ upload_blog.py unpacks this dict into the right WP REST fields.
 
 from __future__ import annotations
 
-import html
 import json
 import re
 import uuid
 
 from ..tools.parse_md import Block, ParsedDoc
+from ._escape import escape_inline as _safe
 
 
 def render(doc: ParsedDoc) -> str:
@@ -47,14 +47,6 @@ def render(doc: ParsedDoc) -> str:
         },
     }
     return json.dumps(payload)
-
-
-def _contains_html(text: str) -> bool:
-    return bool(re.search(r"<[a-zA-Z][^>]*>", text))
-
-
-def _safe(text: str) -> str:
-    return text if _contains_html(text) else html.escape(text)
 
 
 def _wrap_in_section(widget: dict) -> dict:

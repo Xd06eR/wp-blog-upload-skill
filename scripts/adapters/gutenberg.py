@@ -8,10 +8,8 @@ fields after the upload (those plugins do NOT support REST).
 
 from __future__ import annotations
 
-import html
-import re
-
 from ..tools.parse_md import Block, ParsedDoc
+from ._escape import escape_inline
 
 
 def render(doc: ParsedDoc) -> str:
@@ -37,12 +35,8 @@ def _render_block(block: Block) -> str:
     return ""
 
 
-def _contains_html(text: str) -> bool:
-    return bool(re.search(r"<[a-zA-Z][^>]*>", text))
-
-
 def _heading_block(text: str, level: int) -> str:
-    safe = text if _contains_html(text) else html.escape(text)
+    safe = escape_inline(text)
     if level == 1:
         level = 2
     attrs = "" if level == 2 else f' {{"level":{level}}}'
@@ -54,15 +48,11 @@ def _heading_block(text: str, level: int) -> str:
 
 
 def _paragraph_block(text: str) -> str:
-    safe = text if _contains_html(text) else html.escape(text)
-    return f"<!-- wp:paragraph -->\n<p>{safe}</p>\n<!-- /wp:paragraph -->"
+    return f"<!-- wp:paragraph -->\n<p>{escape_inline(text)}</p>\n<!-- /wp:paragraph -->"
 
 
 def _list_block(items: list[str]) -> str:
-    li = "\n".join(
-        f"<li>{i if _contains_html(i) else html.escape(i)}</li>"
-        for i in items
-    )
+    li = "\n".join(f"<li>{escape_inline(i)}</li>" for i in items)
     return (
         "<!-- wp:list -->\n"
         f"<ul>\n{li}\n</ul>\n"
@@ -71,7 +61,7 @@ def _list_block(items: list[str]) -> str:
 
 
 def _cell(text: str) -> str:
-    return text if _contains_html(text) else html.escape(text)
+    return escape_inline(text)
 
 
 def _table_block(rows: list[list[str]]) -> str:

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import html
-import re
-
 from ..tools.parse_md import Block, ParsedDoc
+from ._escape import escape_inline
 
 
 def render(doc: ParsedDoc) -> str:
@@ -18,23 +16,14 @@ def render(doc: ParsedDoc) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def _contains_html(text: str) -> bool:
-    return bool(re.search(r"<[a-zA-Z][^>]*>", text))
-
-
 def _render_block(block: Block) -> str:
     if block.kind in ("h1", "h2", "h3", "h4"):
         level = 2 if block.kind == "h1" else int(block.kind[1])
-        safe = block.text if _contains_html(block.text) else html.escape(block.text)
-        return f"<h{level}>{safe}</h{level}>"
+        return f"<h{level}>{escape_inline(block.text)}</h{level}>"
     if block.kind == "paragraph":
-        safe = block.text if _contains_html(block.text) else html.escape(block.text)
-        return f"<p>{safe}</p>"
+        return f"<p>{escape_inline(block.text)}</p>"
     if block.kind == "list":
-        items = "".join(
-            f"<li>{i if _contains_html(i) else html.escape(i)}</li>"
-            for i in block.items
-        )
+        items = "".join(f"<li>{escape_inline(i)}</li>" for i in block.items)
         return f"<ul>{items}</ul>"
     if block.kind == "table":
         return _table_html(block.rows)
@@ -45,11 +34,8 @@ def _table_html(rows: list[list[str]]) -> str:
     if not rows:
         return ""
 
-    def cell(text: str) -> str:
-        return text if _contains_html(text) else html.escape(text)
-
     def tr(cells: list[str], tag: str) -> str:
-        return "<tr>" + "".join(f"<{tag}>{cell(c)}</{tag}>" for c in cells) + "</tr>"
+        return "<tr>" + "".join(f"<{tag}>{escape_inline(c)}</{tag}>" for c in cells) + "</tr>"
 
     head = f"<thead>{tr(rows[0], 'th')}</thead>"
     body_rows = "".join(tr(r, "td") for r in rows[1:])
