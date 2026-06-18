@@ -17,7 +17,6 @@ upload_blog.py unpacks this dict into the right WP REST fields.
 from __future__ import annotations
 
 import json
-import re
 import uuid
 
 from ..tools.parse_md import Block, ParsedDoc
@@ -67,7 +66,9 @@ def _block_to_widget(block: Block) -> dict | None:
         return {
             "id": _eid(), "elType": "widget",
             "widgetType": "heading", "settings": {
-                "title": re.sub(r"<[^>]+>", "", block.text),
+                # Keep inline <strong>/<a> like the other adapters instead of
+                # stripping every tag; the heading widget renders inline HTML.
+                "title": _safe(block.text),
                 "header_size": size,
                 "align": "left",
             },

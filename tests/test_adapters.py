@@ -92,6 +92,30 @@ class AdapterEscapingTest(unittest.TestCase):
         self.assertIn('href="https://x.com/?a=1&amp;b=2"', out)
 
 
+class ListAndHeadingRenderTest(unittest.TestCase):
+    """H5: Gutenberg list-item wrappers. H6: Elementor keeps inline tags."""
+
+    def test_gutenberg_list_has_list_item_blocks(self) -> None:
+        out = adapters.get("gutenberg")(_doc(Block(kind="list", items=["one", "two"])))
+        self.assertEqual(out.count("<!-- wp:list-item -->"), 2)
+        self.assertEqual(out.count("<!-- /wp:list-item -->"), 2)
+        self.assertIn("<!-- wp:list -->", out)
+        self.assertIn("<li>one</li>", out)
+
+    def test_elementor_heading_keeps_strong(self) -> None:
+        out = adapters.get("elementor")(_doc(Block(kind="h2", text="Buy <strong>now</strong>")))
+        tree = json.loads(json.loads(out)["meta"]["_elementor_data"])
+        heading = tree[0]["elements"][0]["elements"][0]
+        self.assertEqual(heading["widgetType"], "heading")
+        self.assertIn("<strong>now</strong>", heading["settings"]["title"])
+
+    def test_elementor_heading_escapes_bare_amp(self) -> None:
+        out = adapters.get("elementor")(_doc(Block(kind="h2", text="Tom & Jerry")))
+        tree = json.loads(json.loads(out)["meta"]["_elementor_data"])
+        title = tree[0]["elements"][0]["elements"][0]["settings"]["title"]
+        self.assertIn("Tom &amp; Jerry", title)
+
+
 class TodoMetaCommentTest(unittest.TestCase):
     """C4: a `-->` in a meta field must not break out of the hidden comment."""
 

@@ -52,7 +52,12 @@ def _paragraph_block(text: str) -> str:
 
 
 def _list_block(items: list[str]) -> str:
-    li = "\n".join(f"<li>{escape_inline(i)}</li>" for i in items)
+    # Each <li> needs its own wp:list-item wrapper -- WP 6.0+ flags a bare-<li>
+    # list as "unexpected or invalid content" and forces block recovery.
+    li = "\n".join(
+        f"<!-- wp:list-item -->\n<li>{escape_inline(i)}</li>\n<!-- /wp:list-item -->"
+        for i in items
+    )
     return (
         "<!-- wp:list -->\n"
         f"<ul>\n{li}\n</ul>\n"
