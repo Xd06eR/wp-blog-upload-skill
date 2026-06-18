@@ -18,12 +18,12 @@ If you are **running** the skill, read `SKILL.md`. If you are **evolving** it, r
 
 ## What this skill is
 
-An agent parses a markdown blog brief, picks the right client from a local SQLite registry, renders the body for that client's WordPress editor (Gutenberg / Classic / Elementor), and `POST`s it to WP REST as `status=draft`. No preview, no approval gate — the writer reviews in WP admin (where Yoast / RankMath meta must be filled by hand anyway, since those plugins have no REST support).
+An agent parses a blog brief (`.docx` or `.md`, auto-detected by extension), picks the right client from a local SQLite registry, renders the body for that client's WordPress editor (Gutenberg / Classic / Elementor), and `POST`s it to WP REST as `status=draft`. No preview, no approval gate — the writer reviews in WP admin (where Yoast / RankMath meta must be filled by hand anyway, since those plugins have no REST support).
 
 ## Design philosophy (and why)
 
 - **Local agent skill + Python stdlib CLI** (works with any agent that runs a shell — Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, opencode). No server, no `pip install`, zero infrastructure to maintain.
-- **Pure stdlib only** (`urllib`, `sqlite3`, `re`, `dataclasses`). Adding a dependency means non-technical colleagues can't install by copy/clone.
+- **Pure stdlib only** (`urllib`, `sqlite3`, `re`, `dataclasses`, plus `zipfile` + `xml.etree` for the `.docx` reader). Adding a dependency means non-technical colleagues can't install by copy/clone.
 - **Draft-only, hardcoded.** The CLI always sends `status=draft`; it refuses to publish. The draft never goes public until a human edits it in WP admin, which is also where SEO meta gets filled — so the content review happens there, not in chat. That is why there is no preview/approval step.
 - **Immutable skill folder, mutable workspace.** Skill code + docs stay portable (`cp -r` / `git clone`); all per-user state (DB, secrets, playbooks, briefs) lives in a separate `blog-upload-workspace/` outside the skill.
 
@@ -40,34 +40,37 @@ blog-upload/                     ← this repo == the installable skill (root)
 │   ├── run.py                   ← CLI entrypoint (argparse dispatch)
 │   ├── upload_blog.py           ← orchestrator: parse → render → POST
 │   ├── schema.sql               ← SQLite DDL (clients + client_history)
-│   ├── adapters/                ← gutenberg | classic | elementor renderers
-│   └── tools/                   ← parse_md, wp_client, workspace,
-│                                  client_store, client_config, onboarding,
-│                                  playbook
+│   ├── adapters/                ← gutenberg | classic | elementor | _escape
+│   └── tools/                   ← intake, parse_md, docx_reader, parse_docx,
+│                                  wp_client, workspace, client_store,
+│                                  client_config, onboarding, playbook
 └── tests/                       ← stdlib unittest
 
 blog-upload-workspace/           ← per-user state, NOT in this repo (gitignored)
 ├── data/{clients.db, secrets/<slug>.json, playbooks/<slug>.md}
-└── briefs/upload/<name>.md
+└── briefs/upload/<name>.{docx,md}
 ```
 
 Data flow:
 
 ```text
-.md brief → parse_md (strict parser) ──hit──→ render (adapter) → WP REST /posts (draft)
-                     │
-                     └──miss ([])──→ agent maps via inspect-brief →
-                          Route A: normalize on disk → re-parse
-                          Route B: emit ParsedDoc JSON → upload-prepared
+brief (.docx | .md) → intake.parser_for() → parse_docx | parse_md → render (adapter) → WP REST /posts (draft)
 ```
+
+`.docx` parses natively. A `.md` that drifts from the schema falls back to agent
+mapping (`inspect-brief` → normalize, or emit `ParsedDoc` JSON) — see "Brief
+format + fallback".
 
 ## Key components
 
-- **`tools/parse_md.py`** — strict markdown parser + `inspect()` debug dump. Handles single- and multi-client briefs (`### **Brand**` sections). Strips markdown backslash-escapes (see "Markdown escaping" below).
+- **`tools/intake.py`** — format dispatch: `parser_for(path)` picks `parse_docx` (`.docx`) or `parse_md` (else). Both share one `parse` / `list_briefs` surface and the same `ParsedDoc`, so render + upload stay format-agnostic.
+- **`tools/docx_reader.py`** — pure-stdlib WordprocessingML reader (`zipfile` + `xml.etree`); exposes paragraphs/tables (nesting preserved), bold/style/list-item detection, and resolved hyperlinks. Forbids DOCTYPE (billion-laughs guard — no `defusedxml` under no-pip).
+- **`tools/parse_docx.py`** — `.docx` → `ParsedDoc`, mirroring `parse_md`'s API. Exists because some briefs wrap the body in a table cell that markdown export flattens; reading the `.docx` keeps the structure. Covers the house template, multi-body translation files, and paragraph-stream multi-brief; fail-loud on empty body / missing H1.
+- **`tools/parse_md.py`** — strict markdown parser + `inspect()` debug dump. Single- and multi-client briefs (`### **Brand**` sections); strips markdown backslash-escapes (see "Markdown escaping"). Owns the shared helpers `parse_docx` reuses (`_HEADING_LINE`, `clean_keywords`, `_convert_inline`) and the `Brief`/`Block`/`ParsedDoc` dataclasses (`Block.kind` includes `table`).
 - **`tools/workspace.py`** — resolves the workspace root. Order: **downward search** (nearest `blog-upload-workspace/` in a sub-folder of `$PWD`; breadth-first, shallowest wins; skips hidden + heavy dirs; bounded) → **upward search** (first `blog-upload-workspace/` beside an ancestor of `$PWD`, bounded by `_MAX_WALKUP_DEPTH`; resolves the siblings layout when a command runs from inside the skill) → **beside the skill** (`<skill>/../blog-upload-workspace`, anchored via `__file__`): used if present, else the create target. `root()` always returns a path; `find()` returns an existing workspace or `None`, and read-only CLI commands use `find()` so they never create a phantom workspace. No override flag, no env var.
-- **`adapters/`** — one renderer per editor. All three demote body `<h1>` to `<h2>` (post title is already the page H1) and inject a hidden `<!-- TODO META FOR HUMAN -->` comment carrying the meta-title/description.
+- **`adapters/`** — one renderer per editor (gutenberg / classic / elementor) + shared `_escape.py`. All demote body `<h1>` to `<h2>` and inject the hidden `<!-- TODO META FOR HUMAN -->` comment. `_escape` carries the cross-adapter rules: escape text spans but keep inline `<a>`/`<strong>`, and neutralize `-->` in the meta comment. Lists render as `wp:list-item`; `table` blocks as real `<table>`.
 - **`tools/client_store.py` + `schema.sql`** — SQLite registry (`clients`, `client_history` with `ON DELETE CASCADE`).
-- **`tools/onboarding.py`** — credentials flow: file → CLI → chmod-600 secrets file (the DB records only the path). The agent never sees a raw password.
+- **`tools/onboarding.py`** — credentials flow: file → CLI → chmod-600 secrets file (the DB records only the path); the agent never sees a raw password. Refuses to silently overwrite a different client that derives the same slug (`--slug` disambiguates), and reports a defaulted vs detected editor honestly.
 - **`tools/wp_client.py`** — thin WP REST client (`urllib`).
 - **`tools/playbook.py`** — per-client agent memory (`playbooks/<slug>.md`). Two layers: an always-load **index** (`build_index()` → `playbook-index` CLI) of curated `summary` + brand `aliases` per client (frontmatter; hybrid-falls back to the newest headline), and the lazy full **body** (`read(slug)`). The index resolves brand→slug *before* client pick; `set_meta()`/`append_lesson(summary=, aliases=)` curate it.
 
@@ -79,11 +82,11 @@ PYTHONPATH=<skill-dir> python3 -B -m scripts.run <subcommand> ...
 
 `<skill-dir>` = absolute path to this folder. **No environment variable or `~/.bashrc` setup needed** — your agent resolves the path from wherever the skill is installed (in Claude Code, via the `@blog-upload` tag). `-B` suppresses `__pycache__` so the folder stays clean for copy/clone.
 
-## Brief format + alien-format fallback
+## Brief format + fallback
 
-Canonical schema: an `### **Brand**` section header, a pipe table with URL / H1 / Meta Title / Meta Description / Keywords / Word count, then body with `**H1:/H2:/H3:**` headings. Full schema in `REFERENCE.md`.
+`.docx` is the safer default: some writers wrap the article body in a table cell, which markdown export can flatten (structure lost). `parse_docx` reads such briefs natively, so a `.docx` rarely needs any fallback. The `.md` canonical schema: an `### **Brand**` section header, a pipe table with URL / H1 / Meta Title / Meta Description / Keywords / Word count, then body with `**H1:/H2:/H3:**` headings. Full schema in `REFERENCE.md`. Writer formats vary — the parser covers common shapes and the agent adapts to the rest.
 
-When `list-briefs` returns `[]` the brief drifted from the schema. The agent then maps it with `inspect-brief` and either **normalizes it on disk** (Route A, default — mechanical fixes only) or **emits a `ParsedDoc` JSON** for `upload-prepared` (Route B, structurally alien briefs).
+The fallback is **markdown-only**: when `list-briefs` returns `[]` for a `.md` with no `.docx` twin, the agent maps it with `inspect-brief` and either **normalizes it** (Route A, default — mechanical fixes only) or **emits a `ParsedDoc` JSON** for `upload-prepared` (Route B). Both write to a **temp file outside the workspace and delete it after** — never leave a `*-normalized.md` / `_prepared_*.json` artifact in `briefs/upload/` or `data/` (it confuses the non-technical operator). `inspect-brief` is markdown-only (refuses `.docx`, which parses natively).
 
 **Verbatim rule (non-negotiable):** body prose is copied word-for-word. The agent's job is structural mapping, never content rewriting. Only normalize heading levels, list markers, escape characters, and pipe-cell artifacts.
 
