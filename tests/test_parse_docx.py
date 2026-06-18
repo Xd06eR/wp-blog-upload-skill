@@ -29,6 +29,12 @@ def _p(*runs: str) -> str:
     return f"<w:p>{''.join(runs)}</w:p>"
 
 
+def _li(text: str) -> str:
+    """A Word native list-item paragraph (<w:numPr>)."""
+    return ('<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/>'
+            f'</w:numPr></w:pPr>{_r(text)}</w:p>')
+
+
 def _cell(*paras: str) -> str:
     return f"<w:tc>{''.join(paras)}</w:tc>"
 
@@ -182,6 +188,32 @@ class ParseDocxHouseSingleTest(unittest.TestCase):
         self.assertEqual(len(briefs), 1)
         self.assertEqual(briefs[0].h1, "The Title")
         self.assertEqual(briefs[0].word_count, "1000")
+
+    def test_consecutive_list_items_grouped_into_one_list_block(self) -> None:
+        body = (
+            _p(_r("H1: T", bold=True))
+            + _p(_r("Consider this if you:"))
+            + _li("first reason")
+            + _li("second reason")
+            + _li("third reason")
+            + _p(_r("Closing paragraph."))
+        )
+        doc = parse_docx.parse(self._write(_house_body(body)))
+        kinds = [b.kind for b in doc.body]
+        self.assertEqual(kinds, ["paragraph", "list", "paragraph"])
+        listb = doc.body[1]
+        self.assertEqual(listb.items, ["first reason", "second reason", "third reason"])
+
+    def test_separated_list_items_form_separate_lists(self) -> None:
+        body = (
+            _p(_r("H1: T", bold=True))
+            + _li("group one item")
+            + _p(_r("interrupting prose"))
+            + _li("group two item")
+        )
+        doc = parse_docx.parse(self._write(_house_body(body)))
+        lists = [b for b in doc.body if b.kind == "list"]
+        self.assertEqual(len(lists), 2)
 
 
 class ParseDocxInBodyTableTest(unittest.TestCase):

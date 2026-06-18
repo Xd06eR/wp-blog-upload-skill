@@ -142,34 +142,55 @@ def _table_block(table: docx_reader.Table) -> Block:
     return Block(kind="table", rows=rows)
 
 
-def _parse_body_cell(cell: docx_reader.Cell) -> tuple[str, list[Block]]:
-    """Turn the body cell's ordered blocks into (title, blocks).
+def _flush_list(pending: list[str], blocks: list[Block]) -> None:
+    """Emit accumulated consecutive list items as one `list` Block."""
+    if pending:
+        blocks.append(Block(kind="list", items=list(pending)))
+        pending.clear()
 
-    H1 becomes the post title (not a block, matching parse_md). H2-H4 are
-    heading blocks; nested tables become ``table`` blocks in place; every
-    other paragraph is a paragraph block with inline links/bold preserved.
+
+def _walk_blocks(items, *, capture_title: bool) -> tuple[str, list[Block]]:
+    """Shared paragraph/table -> Block walker for both docx body layouts.
+
+    Consecutive Word native-list paragraphs (``is_list_item``) are grouped into
+    a single ``list`` Block. Headings (typed ``Hn:``) become heading blocks;
+    nested tables become ``table`` blocks; everything else is a paragraph. When
+    ``capture_title`` is set, the first H1 is returned as the title instead of a
+    block (matching parse_md / the house template).
     """
     title = ""
     blocks: list[Block] = []
-    for item in cell.blocks:
+    pending_list: list[str] = []
+    for item in items:
         if isinstance(item, docx_reader.Table):
+            _flush_list(pending_list, blocks)
             blocks.append(_table_block(item))
             continue
         text = item.text
         if not text:
             continue
+        if item.is_list_item:
+            pending_list.append(item.html)
+            continue
+        _flush_list(pending_list, blocks)
         m = _HEADING_RE.match(text)
         if m:
             level = int(m.group(1)[1])  # group(1) is "Hn" -> the digit
             heading_text = m.group(2).strip()
-            if level == 1:
+            if level == 1 and capture_title:
                 if not title:
                     title = heading_text
                 continue
             blocks.append(Block(kind=f"h{level}", text=_convert_inline(heading_text)))
             continue
         blocks.append(Block(kind="paragraph", text=item.html))
+    _flush_list(pending_list, blocks)
     return title, blocks
+
+
+def _parse_body_cell(cell: docx_reader.Cell) -> tuple[str, list[Block]]:
+    """Turn the body cell's ordered blocks into (title, blocks)."""
+    return _walk_blocks(cell.blocks, capture_title=True)
 
 
 def _parse_house_single(doc: docx_reader.Document, body_table: docx_reader.Table,
@@ -298,25 +319,9 @@ def _parse_brand_stream(doc: docx_reader.Document, start: int, end: int,
                         *, brand: str, path: Path) -> ParsedDoc:
     """Parse one brand's body from the block slice (start, end)."""
     brief = _kv_brief_in_slice(doc, start, end)
-    title = ""
-    blocks: list[Block] = []
-    for block in doc.blocks[start:end]:
-        if isinstance(block, docx_reader.Table):
-            continue  # the field table is metadata, not body
-        text = block.text
-        if not text:
-            continue
-        m = _HEADING_RE.match(text)
-        if m:
-            level = int(m.group(1)[1])  # group(1) is "Hn" -> the digit
-            htext = m.group(2).strip()
-            if level == 1:
-                if not title:
-                    title = htext
-                continue
-            blocks.append(Block(kind=f"h{level}", text=_convert_inline(htext)))
-            continue
-        blocks.append(Block(kind="paragraph", text=block.html))
+    # Field tables in the slice are metadata, not body -- feed only paragraphs.
+    paras = [b for b in doc.blocks[start:end] if not isinstance(b, docx_reader.Table)]
+    title, blocks = _walk_blocks(paras, capture_title=True)
     if not blocks:
         raise ParseError(f"{path}: brand '{brand}' has no body — nothing to upload.")
     # Title precedence: an H1 in the body, then the field-table H1 / meta title,

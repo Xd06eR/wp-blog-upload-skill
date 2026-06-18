@@ -40,8 +40,13 @@ def _docx(document_body_xml: str, rels_xml: str = "") -> str:
     return tmp.name
 
 
-def _p(*runs: str, style: str = "") -> str:
-    ppr = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
+def _p(*runs: str, style: str = "", list_item: bool = False) -> str:
+    inner = ""
+    if style:
+        inner += f'<w:pStyle w:val="{style}"/>'
+    if list_item:
+        inner += "<w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"1\"/></w:numPr>"
+    ppr = f"<w:pPr>{inner}</w:pPr>" if inner else ""
     return f"<w:p>{ppr}{''.join(runs)}</w:p>"
 
 
@@ -81,6 +86,11 @@ class DocxReaderTest(unittest.TestCase):
     def test_pstyle_exposed(self) -> None:
         doc = self._read(_p(_r("ChefCollective"), style="Heading3"))
         self.assertEqual(doc.paragraphs[0].style, "Heading3")
+
+    def test_is_list_item_detects_numpr(self) -> None:
+        doc = self._read(_p(_r("a bullet"), list_item=True) + _p(_r("plain")))
+        self.assertTrue(doc.paragraphs[0].is_list_item)
+        self.assertFalse(doc.paragraphs[1].is_list_item)
 
     def test_hyperlink_resolves_to_real_url(self) -> None:
         body = _p(

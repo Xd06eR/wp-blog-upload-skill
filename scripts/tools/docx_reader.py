@@ -178,6 +178,17 @@ class Para:
         text_runs = [r for r in runs if _run_text(r).strip()]
         return bool(text_runs) and all(_is_bold_run(r) for r in text_runs)
 
+    @property
+    def is_list_item(self) -> bool:
+        """True when the paragraph is a Word native list item (`<w:numPr>`).
+
+        Word marks bullet / numbered list items with a ``<w:numPr>`` in the
+        paragraph properties rather than literal bullet characters. Consecutive
+        such paragraphs form one list.
+        """
+        ppr = self._el.find(_w("pPr"))
+        return ppr is not None and ppr.find(_w("numPr")) is not None
+
 
 class Cell:
     """One ``<w:tc>`` table cell.
