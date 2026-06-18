@@ -149,6 +149,26 @@ def _flush_list(pending: list[str], blocks: list[Block]) -> None:
         pending.clear()
 
 
+# Leading orphan close-tags left after splitting a paragraph's HTML at the soft
+# line break (a bold heading run leaves a dangling ``</strong>`` in front of the
+# body). Strip them so the body paragraph is well-formed.
+_LEADING_CLOSE_TAGS = re.compile(r"^\s*(?:</(?:strong|em|b|i|a)>\s*)+")
+
+
+def _emit_heading(m: re.Match, blocks: list[Block], *, capture_title: bool, title: str) -> str:
+    """Append a heading block, or capture the first H1 as the title.
+
+    Returns the (possibly updated) title. With ``capture_title`` set, an H1 is
+    taken as the post title and not emitted as a body block (mirrors parse_md).
+    """
+    level = int(m.group(1)[1])  # group(1) is "Hn" -> the digit
+    heading_text = m.group(2).strip()
+    if level == 1 and capture_title:
+        return title or heading_text
+    blocks.append(Block(kind=f"h{level}", text=_convert_inline(heading_text)))
+    return title
+
+
 def _walk_blocks(items, *, capture_title: bool) -> tuple[str, list[Block]]:
     """Shared paragraph/table -> Block walker for both docx body layouts.
 
@@ -173,15 +193,23 @@ def _walk_blocks(items, *, capture_title: bool) -> tuple[str, list[Block]]:
             pending_list.append(item.html)
             continue
         _flush_list(pending_list, blocks)
+        # A heading the writer crammed into the same <w:p> as its body via a soft
+        # line break (<w:br> -> '\n'): the single-line _HEADING_RE won't match the
+        # multi-line text, so split the leading heading line into its own block and
+        # keep the remainder (with its inline links) as the following paragraph.
+        if "\n" in text:
+            first_line, rest_text = text.split("\n", 1)
+            hm = _HEADING_RE.match(first_line)
+            if hm and rest_text.strip():
+                title = _emit_heading(hm, blocks, capture_title=capture_title, title=title)
+                body_html = item.html.split("\n", 1)[1] if "\n" in item.html else rest_text
+                body_html = _LEADING_CLOSE_TAGS.sub("", body_html).strip()
+                if body_html:
+                    blocks.append(Block(kind="paragraph", text=body_html))
+                continue
         m = _HEADING_RE.match(text)
         if m:
-            level = int(m.group(1)[1])  # group(1) is "Hn" -> the digit
-            heading_text = m.group(2).strip()
-            if level == 1 and capture_title:
-                if not title:
-                    title = heading_text
-                continue
-            blocks.append(Block(kind=f"h{level}", text=_convert_inline(heading_text)))
+            title = _emit_heading(m, blocks, capture_title=capture_title, title=title)
             continue
         blocks.append(Block(kind="paragraph", text=item.html))
     _flush_list(pending_list, blocks)

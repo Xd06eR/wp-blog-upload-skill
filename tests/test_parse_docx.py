@@ -215,6 +215,56 @@ class ParseDocxHouseSingleTest(unittest.TestCase):
         lists = [b for b in doc.body if b.kind == "list"]
         self.assertEqual(len(lists), 2)
 
+    def test_heading_crammed_with_body_via_soft_break_is_split(self) -> None:
+        # Writer put "H2: ..." and the body in ONE <w:p>, separated by a soft
+        # line break (<w:br>). The single-line heading regex misses the
+        # multi-line text, so the parser must split the leading heading off.
+        crammed = (
+            "<w:p>"
+            '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">H2: First Section</w:t><w:br/></w:r>'
+            '<w:r><w:t xml:space="preserve">Body after the soft break.</w:t></w:r>'
+            "</w:p>"
+        )
+        body = _p(_r("H1: T", bold=True)) + crammed
+        doc = parse_docx.parse(self._write(_house_body(body)))
+        kinds = [(b.kind, b.text) for b in doc.body]
+        self.assertEqual(kinds, [
+            ("h2", "First Section"),
+            ("paragraph", "Body after the soft break."),
+        ])
+
+    def test_crammed_heading_body_keeps_inline_link(self) -> None:
+        link = '<w:hyperlink r:id="rId9">' + _r("shop") + "</w:hyperlink>"
+        crammed = (
+            "<w:p>"
+            '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">H2: Visit</w:t><w:br/></w:r>'
+            '<w:r><w:t xml:space="preserve">See </w:t></w:r>'
+            + link
+            + '<w:r><w:t xml:space="preserve"> today.</w:t></w:r>'
+            "</w:p>"
+        )
+        body = _p(_r("H1: T", bold=True)) + crammed
+        rels = '<Relationship Id="rId9" Target="https://acme.example/x"/>'
+        doc = parse_docx.parse(self._write(_house_body(body), rels))
+        h2 = [b for b in doc.body if b.kind == "h2"]
+        para = [b for b in doc.body if b.kind == "paragraph"]
+        self.assertEqual(h2[0].text, "Visit")
+        self.assertEqual(para[0].text, 'See <a href="https://acme.example/x">shop</a> today.')
+
+    def test_soft_break_without_leading_heading_stays_one_paragraph(self) -> None:
+        # A genuine multi-line paragraph (soft break, no heading on line 1) must
+        # NOT be split -- guards against over-splitting.
+        multiline = (
+            "<w:p>"
+            '<w:r><w:t xml:space="preserve">Line one of an address</w:t><w:br/></w:r>'
+            '<w:r><w:t xml:space="preserve">line two, same paragraph.</w:t></w:r>'
+            "</w:p>"
+        )
+        body = _p(_r("H1: T", bold=True)) + multiline
+        doc = parse_docx.parse(self._write(_house_body(body)))
+        paras = [b for b in doc.body if b.kind == "paragraph"]
+        self.assertEqual(len(paras), 1)
+
 
 class ParseDocxInBodyTableTest(unittest.TestCase):
     """A nested Word table inside the body cell -> a `table` Block, in order."""
