@@ -96,8 +96,16 @@ def register_client(
         "username": username,
         "app_password": app_password,
     }
-    creds_path.write_text(json.dumps(creds_payload, indent=2))
-    creds_path.chmod(0o600)
+    # Lock the file down BEFORE the secret touches it: create it empty with
+    # 0600, then write. If anything fails, delete the partial file so a
+    # plaintext credential is never left readable on disk.
+    try:
+        creds_path.touch(mode=0o600, exist_ok=True)
+        creds_path.chmod(0o600)
+        creds_path.write_text(json.dumps(creds_payload, indent=2))
+    except OSError as e:
+        creds_path.unlink(missing_ok=True)
+        raise WPError(f"Could not write credentials securely to {creds_path}: {e}") from e
 
     from .client_config import ClientConfig
     cfg = ClientConfig(

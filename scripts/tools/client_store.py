@@ -71,8 +71,11 @@ class ClientStore:
 
         with self._connect() as con:
             con.executescript(SCHEMA_PATH.read_text())
+            # Order by version, not applied_at: the timestamp has 1-second
+            # resolution, so two migrations applied in the same second could
+            # otherwise resolve in the wrong order.
             row = con.execute(
-                "SELECT version FROM _schema_version ORDER BY applied_at DESC LIMIT 1"
+                "SELECT version FROM _schema_version ORDER BY version DESC LIMIT 1"
             ).fetchone()
             current = row["version"] if row else 0
             self._migrate(con, current)

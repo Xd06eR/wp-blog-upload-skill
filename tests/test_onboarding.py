@@ -103,6 +103,15 @@ class SlugCollisionTest(unittest.TestCase):
         self.assertTrue(onboarding.client_exists("acme"))
         self.assertTrue(onboarding.client_exists("acme-org"))
 
+    def test_creds_file_cleaned_up_on_write_failure(self) -> None:
+        # M2: a chmod/write failure must not leave a plaintext credential file.
+        from pathlib import Path as _P
+        with mock.patch.object(_P, "write_text", side_effect=OSError("read-only fs")):
+            with self.assertRaises(WPError):
+                self._onboard("acme", "https://acme.com/")
+        secrets = workspace.secrets_dir()
+        self.assertFalse((secrets / "acme.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

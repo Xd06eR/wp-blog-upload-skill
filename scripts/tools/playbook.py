@@ -73,6 +73,10 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:
     Returns (meta, body). `meta['aliases']` is a list[str]; other keys are
     plain strings. No frontmatter -> ({}, text) unchanged.
     """
+    # Normalize CRLF/CR so a Windows-edited playbook still matches the `\n`
+    # fence regex -- otherwise the frontmatter is missed and the always-loaded
+    # index silently loses its curated summary + aliases.
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     m = _FRONTMATTER.match(text)
     if not m:
         return {}, text

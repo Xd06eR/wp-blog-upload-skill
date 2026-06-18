@@ -48,6 +48,14 @@ class PlaybookTest(unittest.TestCase):
         out = playbook._serialize_frontmatter(meta)
         self.assertEqual(out, "---\nsummary: A short fact\naliases: brandx, brand-y\n---\n")
 
+    def test_crlf_frontmatter_is_parsed(self) -> None:
+        # A Windows-edited (CRLF) playbook must still match the fence so the
+        # always-loaded index keeps its curated summary + aliases.
+        text = "---\r\nsummary: Win fact\r\naliases: brandx\r\n---\r\n# body\r\n"
+        meta, body = playbook._parse_frontmatter(text)
+        self.assertEqual(meta["summary"], "Win fact")
+        self.assertEqual(meta["aliases"], ["brandx"])
+
     def test_no_frontmatter_is_passthrough(self) -> None:
         text = "# Playbook — x\n\n## 2026-01-01 — hi\n\nbody\n"
         meta, body = playbook._parse_frontmatter(text)
