@@ -27,6 +27,7 @@ class OnboardResult:
     detected_editor: str
     credentials_path: str
     site_name: str = ""
+    editor_detected: bool = True  # False = defaulted, operator should verify
 
 
 def derive_slug(site_url: str) -> str:
@@ -66,11 +67,26 @@ def register_client(
     # Normalize once at the entry point so every downstream artifact (creds
     # JSON, DB row, editor probe, REST calls) shares the same clean site root.
     site_url = _normalize_site_root(site_url)
+
+    # Slug-collision guard: refuse to silently overwrite a DIFFERENT client that
+    # already derived the same slug (two sites sharing a domain head). The
+    # operator must pass an explicit slug to disambiguate. Re-onboarding the
+    # SAME site (same root) is allowed -- that is a credential refresh.
+    store = get_store()
+    existing = store.get(slug)
+    if existing and _normalize_site_root(existing.wp_base_url) != site_url:
+        raise WPError(
+            f"Slug '{slug}' is already registered to {existing.wp_base_url}. "
+            f"Two sites share the domain head '{slug}'. Onboard with an explicit "
+            f"--slug to disambiguate (the existing client was NOT changed)."
+        )
+
     creds = WPCredentials(site_url=site_url, username=username, app_password=app_password)
     site_name = _verify_login(creds)
 
+    editor_detected = True
     if not editor:
-        editor = detect_editor(creds)
+        editor, editor_detected = detect_editor(creds)
 
     workspace.ensure()
     secrets = workspace.secrets_dir()
@@ -95,13 +111,14 @@ def register_client(
         default_category=default_category,
         default_tags=default_tags or [],
     )
-    get_store().save(cfg, by=by)
+    store.save(cfg, by=by)
 
     return OnboardResult(
         slug=slug,
         detected_editor=editor,
         credentials_path=str(creds_path),
         site_name=site_name,
+        editor_detected=editor_detected,
     )
 
 
@@ -137,13 +154,22 @@ def _verify_login(creds: WPCredentials) -> str:
     return me.get("name") or me.get("slug") or creds.username
 
 
-def detect_editor(creds: WPCredentials) -> str:
-    """Fetch a recent post and infer editor from its content shape.
+_DEFAULT_EDITOR = "gutenberg"
+
+
+def detect_editor(creds: WPCredentials) -> tuple[str, bool]:
+    """Fetch a recent post and infer the editor from its content shape.
+
+    Returns ``(editor, detected)``. ``detected`` is False when the probe could
+    not actually determine the editor and the default (gutenberg) was assumed
+    -- so the caller can tell the operator to verify it rather than presenting
+    a guess as fact.
 
     Heuristics (in order):
       - content contains '<!-- wp:'   -> gutenberg
       - meta has '_elementor_data'    -> elementor
-      - else                          -> classic
+      - a post exists but matches neither -> classic
+      - probe failed / no posts        -> gutenberg default (detected=False)
     """
     try:
         status, body = _wp_get(
@@ -151,24 +177,26 @@ def detect_editor(creds: WPCredentials) -> str:
             query={"per_page": "5", "status": "publish,draft", "context": "edit"},
         )
     except WPError:
-        return "gutenberg"
+        return _DEFAULT_EDITOR, False
 
     if status >= 400 or not body:
-        return "gutenberg"
+        return _DEFAULT_EDITOR, False
 
     try:
         posts = json.loads(body.decode("utf-8")) or []
     except json.JSONDecodeError:
-        return "gutenberg"
+        return _DEFAULT_EDITOR, False
 
     for post in posts:
         content = (post.get("content") or {}).get("raw") or (post.get("content") or {}).get("rendered") or ""
         if "<!-- wp:" in content:
-            return "gutenberg"
+            return "gutenberg", True
         meta = post.get("meta") or {}
         if "_elementor_data" in meta or post.get("elementor_data"):
-            return "elementor"
-    return "classic" if posts else "gutenberg"
+            return "elementor", True
+    if posts:
+        return "classic", True
+    return _DEFAULT_EDITOR, False
 
 
 def _site_root(site_url: str) -> str:

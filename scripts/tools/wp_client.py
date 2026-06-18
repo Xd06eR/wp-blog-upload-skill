@@ -23,11 +23,14 @@ class WPError(Exception):
 
 
 # Known WP admin suffixes — stripped to get the public site root.
-# Order matters: longer suffixes first so `/wp-admin` is preferred over `/admin`.
+# Order matters: longer suffixes first so `/wp-admin` is preferred.
+# NOTE: bare `/admin` is deliberately NOT stripped — it is a legitimate
+# sub-directory install path for some sites, and stripping it unconditionally
+# mangled their REST root. Operators on a `/admin` staging URL should paste the
+# public root instead.
 _ADMIN_SUFFIXES = (
     "/wp-login.php",
     "/wp-admin",
-    "/admin",
 )
 
 
@@ -40,12 +43,11 @@ def _normalize_site_root(site_url: str) -> str:
       - https://client.com/wp-admin
       - https://client.com/wp-admin/
       - https://client.com/wp-login.php
-      - https://client.com/admin            (WP-Engine staging pattern)
-      - https://client.com/admin/
 
     Strips any of the known admin suffixes and trailing slashes. Does not
-    touch sub-directory installs (e.g. https://client.com/blog) since
-    those aren't admin paths.
+    touch sub-directory installs (e.g. https://client.com/blog or a site that
+    genuinely lives under https://client.com/admin) since those aren't the
+    admin login paths.
     """
     base = site_url.rstrip("/")
     for suffix in _ADMIN_SUFFIXES:

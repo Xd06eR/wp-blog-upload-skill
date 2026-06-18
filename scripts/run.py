@@ -41,6 +41,9 @@ def main(argv: list[str] | None = None) -> int:
     p_onboard = sub.add_parser("onboard", help="Register a new client from a credentials JSON.")
     p_onboard.add_argument("--from-file", required=True,
                            help="Path to credentials JSON (matches data/secrets/.env.example). Deleted on success.")
+    p_onboard.add_argument("--slug", default=None,
+                           help="Explicit client slug. Auto-derived from site_url when omitted; "
+                                "pass this to disambiguate two sites sharing a domain head.")
 
     p_briefs = sub.add_parser("list-briefs",
                               help="Pre-scan a markdown brief for embedded client sections (JSON).")
@@ -165,7 +168,7 @@ def _run_onboard(args) -> int:
         )
         return 2
 
-    slug = onboarding.derive_slug(site_url)
+    slug = args.slug.strip() if args.slug else onboarding.derive_slug(site_url)
     print(f"Onboarding '{slug}' from {src.name} ...")
 
     try:
@@ -187,10 +190,17 @@ def _run_onboard(args) -> int:
         print(f"  WARNING: could not delete {src.name}: {e}", file=sys.stderr)
         print("  Delete it manually -- it contains the real app password.", file=sys.stderr)
 
+    if result.editor_detected:
+        editor_line = f"  Detected editor: {result.detected_editor}\n"
+    else:
+        editor_line = (
+            f"  Editor:          {result.detected_editor} (DEFAULTED — could not detect; "
+            f"verify in WP admin and re-onboard with the right editor if the draft body looks wrong)\n"
+        )
     print(
         f"\n[OK] Registered client '{result.slug}'\n"
         f"  Site:            {site_url}\n"
-        f"  Detected editor: {result.detected_editor}\n"
+        f"{editor_line}"
         f"  Credentials:     {result.credentials_path} (chmod 600)\n"
     )
     return 0
