@@ -312,7 +312,7 @@
 
     <p>What the tool does for you:</p>
     <ul>
-      <li>Reads your blog brief (a Markdown file).</li>
+      <li>Reads your blog brief (a Word <code>.docx</code> file — or a Markdown <code>.md</code> file).</li>
       <li>Picks the right client — and if it's a <strong>new</strong> client, walks you through setting it up.</li>
       <li>Creates a <strong>draft</strong> post on WordPress (it never publishes — you do that yourself).</li>
     </ul>
@@ -326,12 +326,10 @@
 
   <div class="surface">
     <h2>How you talk to your agent</h2>
-    <p><strong>Name the skill when you ask</strong> — that's how the agent knows to use <em>this</em> tool instead of guessing. In Claude Code you tag it: type <span class="at-tag">@blog-upload</span>. In other agents, say "use the blog-upload skill". Point at your brief the same way — <code>@my-brief.md</code> in Claude Code, or just name the file.</p>
+    <p><strong>Tag the skill and your brief when you ask</strong> — that's how the agent knows to use <em>this</em> tool instead of guessing. Most agents share the <span class="at-tag">@</span>-mention convention: type <code>@</code> and pick the name. Tag the skill (<span class="at-tag">@blog-upload</span>) and point at your brief the same way (<code>@my-brief.docx</code>). The exact tagging syntax can vary by agent — if <code>@</code> doesn't bring up a picker, check how your agent references files and skills.</p>
     <div class="callout callout-tip">💡 <strong>Keep the <code>blog-upload</code> folder in your working directory and tag it explicitly.</strong> Don't rely on the agent auto-detecting it — auto-invoke can misfire (trigger when you don't want it, or stay quiet during an upload when you do).</div>
-    <p><strong>Example (Claude Code):</strong></p>
-    <blockquote><span class="at-tag">@blog-upload</span> upload <code>@my-brief.md</code> for Acme Catering</blockquote>
-    <p><strong>Other agents:</strong></p>
-    <blockquote>Use the blog-upload skill to upload <code>my-brief.md</code> for Acme Catering.</blockquote>
+    <p><strong>Example:</strong></p>
+    <blockquote><span class="at-tag">@blog-upload</span> upload <code>@my-brief.docx</code> for Acme Catering</blockquote>
     <p>The agent does the rest — reads the brief, finds the client, and creates the draft.</p>
   </div>
 
@@ -342,9 +340,10 @@
     <p><strong>① Set up the skill — first time only</strong></p>
     <blockquote>Clone the blog-upload skill and set up its workspace for me. Run <code>git clone https://github.com/Xd06eR/wp-blog-upload-skill.git blog-upload</code>, then go into the <code>blog-upload</code> folder and initialize the workspace.</blockquote>
 
-    <p><strong>② Upload a blog</strong></p>
-    <blockquote>Using the blog-upload skill, upload <code>‹your-brief.md›</code> for <code>‹Client Name›</code> as a WordPress draft, then give me the draft link. (Claude Code shortcut: <span class="at-tag">@blog-upload</span> <code>upload @‹your-brief.md› for ‹Client Name›</code>)</blockquote>
+    <p><strong>② Upload a blog</strong> — same prompt in any agent; only the way you tag the file may differ.</p>
+    <blockquote><span class="at-tag">@blog-upload</span> upload <code>@‹your-brief.docx›</code> for <code>‹Client Name›</code></blockquote>
     <ul>
+      <li>The skill always uploads as a <strong>draft</strong> and gives you back the draft link — you don't need to ask for either.</li>
       <li>If the file has sections for several clients, the agent shows the list and asks which one.</li>
       <li>If the client is new, the agent notices and walks you through adding it (it asks you for the WordPress site address, username, and an application password).</li>
     </ul>
@@ -361,7 +360,7 @@
     <h2>🗒️ Your First Day Checklist</h2>
     <ul class="checklist">
       <li><input type="checkbox"><div><span class="step-num">Step 1.</span> Set up the skill + workspace (prompt ① above) — <em>one-time</em></div></li>
-      <li><input type="checkbox"><div><span class="step-num">Step 2.</span> Get your blog brief as Markdown</div></li>
+      <li><input type="checkbox"><div><span class="step-num">Step 2.</span> Get your blog brief as a Word file (<code>.docx</code>)</div></li>
       <li><input type="checkbox"><div><span class="step-num">Step 3.</span> Upload it (prompt ②) — the agent handles the rest</div></li>
       <li><input type="checkbox"><div><span class="step-num">Step 4.</span> Open the draft in WordPress, fill the meta, hit Publish</div></li>
     </ul>
@@ -374,25 +373,18 @@
     <h3><span class="step-badge">1</span>Get the skill + workspace (one time)</h3>
     <p><strong>Just ask your agent:</strong> paste prompt ① above. It clones the skill <strong>and</strong> sets up the workspace — a <code>blog-upload-workspace</code> folder where your briefs and saved client info live. You never open a terminal or manage that folder by hand.</p>
 
-    <h3><span class="step-badge">2</span>Get your brief as Markdown</h3>
-    <p>Markdown (<code>.md</code>) is the <strong>recommended, most reliable</strong> format — the skill is built for it. Other formats <em>may</em> work, but Markdown is the safe, stable choice, so use it whenever you can.</p>
-    <p><strong>Option 1 — download the whole brief (easiest):</strong></p>
+    <h3><span class="step-badge">2</span>Get your brief as a Word file (.docx)</h3>
+    <p>Word (<code>.docx</code>) is the <strong>recommended, safe default</strong> — download the Google Doc as Word and hand that to the agent.</p>
+    <div class="callout callout-tip">💡 <strong>Why Word, not Markdown?</strong> Some briefs put the blog body <strong>inside a table</strong> in the Google Doc. When they do, downloading as Markdown can flatten that table and lose the headings and paragraphs — so the draft may come out wrong. Downloading as <strong>Word (.docx)</strong> keeps everything — headings, paragraphs, tables, bullet lists, and links — so it's the safer choice either way.</div>
+    <p><strong>Download the whole brief as Word (do this):</strong></p>
     <ol>
       <li>Open the brief in <strong>Google Docs</strong>.</li>
       <li>Menu:
-        <div><span class="menu-path">File <span class="arrow">▸</span> Download <span class="arrow">▸</span> Markdown (.md)</span></div>
+        <div><span class="menu-path">File <span class="arrow">▸</span> Download <span class="arrow">▸</span> Microsoft Word (.docx)</span></div>
       </li>
-      <li>It lands in your Downloads folder (e.g. <code>my-blog-brief.md</code>).</li>
+      <li>It lands in your Downloads folder (e.g. <code>my-blog-brief.docx</code>). Hand that file to the agent.</li>
     </ol>
-    <p><strong>Option 2 — copy just one section as Markdown:</strong></p>
-    <ol>
-      <li><strong>One-time setup:</strong> turn Markdown on —
-        <div><span class="menu-path">Tools <span class="arrow">▸</span> Preferences <span class="arrow">▸</span> ✓ Enable Markdown</span></div>
-      </li>
-      <li>Select the part of the doc you want.</li>
-      <li><strong>Edit → Copy as Markdown</strong> (or right-click → Copy as Markdown).</li>
-      <li>Paste into any plain-text editor and save the file with a <code>.md</code> ending.</li>
-    </ol>
+    <p><strong>Alternative — Markdown (<code>.md</code>), for simple posts only:</strong> the skill still accepts Markdown, and it's fine when the brief has no table around the body. To get it, use <span class="menu-path">File <span class="arrow">▸</span> Download <span class="arrow">▸</span> Markdown (.md)</span> — <em>or</em> turn Markdown on (<span class="menu-path">Tools <span class="arrow">▸</span> Preferences <span class="arrow">▸</span> ✓ Enable Markdown</span>) and use <strong>Edit → Copy as Markdown</strong>, then paste into a plain-text editor and save with a <code>.md</code> ending. When in doubt, use Word — it's the safer choice.</p>
     <h3><span class="step-badge">3</span>Upload it</h3>
     <p><strong>Easiest — ask your agent</strong> (paste prompt ②, or use your agent's file shortcut). Give the <strong>client name</strong> + the <strong>file</strong>. The agent then:</p>
     <ul>

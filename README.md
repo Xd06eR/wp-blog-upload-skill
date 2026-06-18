@@ -1,27 +1,30 @@
 # WordPress Blog Upload Skill
 
-An **AI agent skill** that uploads markdown blog briefs to WordPress as draft posts — eliminating the copy-paste step between Google Docs and WordPress admin. You drive it in plain English; the agent does the rest.
+An **AI agent skill** that uploads blog briefs to WordPress as draft posts — eliminating the copy-paste step between Google Docs and WordPress admin. You drive it in plain English; the agent does the rest.
+
+It accepts both Word (`.docx`) and Markdown (`.md`) briefs, auto-detected by file extension. **`.docx` is the safer default:** writers format briefs differently, and some wrap the blog body inside a table — Markdown export can flatten that table and lose the headings and paragraphs, whereas `.docx` keeps the full structure intact.
 
 **Works with any AI coding agent** that can run a shell — Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, opencode, and others. Under the hood the agent drives a pure-Python CLI, but **that CLI is the agent's internal engine — operators never type a command, and the prompt templates work the same in every agent.** Examples in these docs use Claude Code's `@` shortcut.
 
 > 👉 **Just want to use it — no coding?** Open **[`GUIDE.html`](GUIDE.html)** in your browser for a step-by-step, plain-English guide. You talk to the agent; you never touch a terminal. The rest of this README is maintainer context for whoever installs or extends the skill.
 
-The agent parses a `.md` brief, picks the right client from a local SQLite store, renders the body for the client's editor (Gutenberg, Classic, or Elementor), and POSTs straight to WordPress as `status=draft`. No preview, no approval gate — the writer reviews and fills Yoast / RankMath meta in WP admin, which they have to do anyway.
+The agent parses a `.docx` or `.md` brief (auto-detected by extension), picks the right client from a local SQLite store, renders the body for the client's editor (Gutenberg, Classic, or Elementor), and POSTs straight to WordPress as `status=draft`. No preview, no approval gate — the writer reviews and fills Yoast / RankMath meta in WP admin, which they have to do anyway.
 
 ## Features
 
-- **Single- or multi-client briefs** — one `.md` file can hold briefs for several brands; the agent filters by brand heading (`### **BrandName**`).
-- **Flexible brief intake** — a strict parser handles the canonical schema, and an **agent-driven fallback** absorbs alien formats (Roman-numeral tables, body-in-cell, missing brand header, drifting writer conventions). The agent maps the brief via `inspect-brief`, then either normalizes it on disk or emits a `ParsedDoc` JSON straight to `upload-prepared` — body prose is copied verbatim, never paraphrased.
+- **Word or Markdown briefs** — accepts `.docx` and `.md`, auto-detected by extension. **`.docx` is the safer default** because some briefs wrap the body in a table that Markdown export can flatten (headings/paragraphs lost); `.docx` preserves the full structure. `.md` still works for briefs whose body isn't table-wrapped.
+- **Single- or multi-client briefs** — one brief file can hold briefs for several brands; the agent filters by brand heading (`### **BrandName**`).
+- **Handles varied brief shapes** — the `.docx` reader parses common real-world layouts directly: a table-wrapped body, Roman-numeral field tables, full-width colons, in-body tables, and Word native bullet lists, all without a manual step. Writer formats vary, so for a `.md` that drifts from the schema (and has no `.docx` twin), an **agent-driven fallback** adapts — map it via `inspect-brief`, normalize it, or emit a `ParsedDoc` JSON to `upload-prepared` (using a temp file, cleaned up after); body prose is copied verbatim, never paraphrased.
 - **Per-client editor adapters** — auto-detects and renders Gutenberg blocks, Classic HTML, or Elementor JSON envelopes.
 - **SQLite client registry** — onboard new clients via a JSON file; credentials are verified against WP REST before storage.
-- **Pure Python stdlib** — no `pip install`, no virtualenv. Copy the skill folder and go.
+- **Pure Python stdlib** — no `pip install`, no virtualenv. Copy the skill folder and go. The native `.docx` reader is stdlib-only (`zipfile` + `xml.etree`), consistent with the skill's no-dependency philosophy.
 - **Per-client playbook** — agent memory stored as markdown lessons so repeat quirks (e.g. "this writer always omits the URL row") are handled automatically.
 - **Hardcoded draft-only** — the CLI refuses to auto-publish. Every upload lands in `status=draft`.
 
 ## How it works
 
 ```text
-Operator drops .md brief ──▶ Agent picks client ──▶ list-briefs (strict parser)
+Operator drops .docx or .md brief ──▶ Agent picks client ──▶ list-briefs (strict parser)
                                                             │
                        ┌────────────────────────────────────┤
                        ▼                                    ▼
@@ -112,10 +115,10 @@ The repo root *is* the skill, so this puts everything at `~/blog-upload/` — th
 
 ### 2. Use it
 
-Launch your AI coding agent (Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, …) from your home folder (`~/`) and **explicitly invoke the skill** — tag it in Claude Code, or name it ("use the blog-upload skill") in other agents:
+Launch your AI coding agent (Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, …) from your home folder (`~/`) and **explicitly invoke the skill** by tagging it and the brief. Most agents share the `@`-mention convention; the exact tag syntax may vary by agent:
 
 ```text
-@blog-upload upload @my-brief.md for <Client>
+@blog-upload upload @my-brief.docx for <Client>
 ```
 
 Non-technical operators: open `GUIDE.html` in a browser and follow it step by step.

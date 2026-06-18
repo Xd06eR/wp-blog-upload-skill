@@ -3,7 +3,7 @@
 Hi! This guide shows you how to upload blog drafts to a client's WordPress site using an **AI coding agent** — Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, opencode, whichever your team uses. **You don't need to know any code — you just type plain-English prompts.**
 
 What the tool does for you:
-- Reads your blog brief (a Markdown file).
+- Reads your blog brief (a Word `.docx` file — or a Markdown `.md` file).
 - Picks the right client — and if it's a **new** client, walks you through setting it up.
 - Creates a **draft** post on WordPress (it never publishes — you do that yourself).
 
@@ -15,17 +15,13 @@ What the tool does for you:
 
 ## How you talk to your agent
 
-**Name the skill when you ask** — that's how the agent knows to use *this* tool instead of guessing. In Claude Code you tag it: type `@blog-upload`. In other agents, say "use the blog-upload skill". Point at your brief the same way — `@my-brief.md` in Claude Code, or just name the file.
+**Tag the skill and your brief when you ask** — that's how the agent knows to use *this* tool instead of guessing. Most agents share the `@`-mention convention: type `@` and pick the name. Tag the skill (`@blog-upload`) and point at your brief the same way (`@my-brief.docx`). The exact tagging syntax can vary by agent — if `@` doesn't bring up a picker, check how your agent references files and skills.
 
 > 💡 **Keep the `blog-upload` folder in your working directory and tag it explicitly.** Don't rely on the agent auto-detecting it — auto-invoke can misfire (trigger when you don't want it, or stay quiet during an upload when you do).
 
-Example (Claude Code):
+Example:
 
-> `@blog-upload upload @my-brief.md for Acme Catering`
-
-Other agents:
-
-> Use the blog-upload skill to upload my-brief.md for Acme Catering.
+> `@blog-upload upload @my-brief.docx for Acme Catering`
 
 The agent does the rest — reads the brief, finds the client, and creates the draft.
 
@@ -39,10 +35,11 @@ Each prompt pairs plain English with the exact command, so the agent acts reliab
 
 > Clone the blog-upload skill and set up its workspace for me. Run `git clone https://github.com/Xd06eR/wp-blog-upload-skill.git blog-upload`, then go into the `blog-upload` folder and initialize the workspace.
 
-**② Upload a blog**
+**② Upload a blog** — same prompt in any agent; only the way you tag the file may differ.
 
-> Using the blog-upload skill, upload `‹your-brief.md›` for `‹Client Name›` as a WordPress draft, then give me the draft link. (Claude Code shortcut: `@blog-upload upload @‹your-brief.md› for ‹Client Name›`)
+> `@blog-upload` upload `@‹your-brief.docx›` for `‹Client Name›`
 
+> - The skill always uploads as a **draft** and gives you back the draft link — you don't need to ask for either.
 > - If the file has sections for several clients, the agent shows the list and asks which one.
 > - If the client is new, the agent notices and walks you through adding it (it asks you for the WordPress site address, username, and an application password).
 
@@ -57,7 +54,7 @@ Each prompt pairs plain English with the exact command, so the agent acts reliab
 ## 🗒️ Your First Day Checklist
 
 - [ ] **Step 1.** Set up the skill + workspace (prompt ① above) — *one-time*
-- [ ] **Step 2.** Get your blog brief as Markdown
+- [ ] **Step 2.** Get your blog brief as a Word file (`.docx`)
 - [ ] **Step 3.** Upload it (prompt ②) — the agent handles the rest
 - [ ] **Step 4.** Open the draft in WordPress, fill the meta, hit Publish
 
@@ -71,20 +68,18 @@ After today you only repeat Steps 2–4.
 
 **Just ask your agent:** paste prompt ① above. It clones the skill **and** sets up the workspace — a `blog-upload-workspace` folder where your briefs and saved client info live. You never open a terminal or manage that folder by hand.
 
-### Step 2 — Get your brief as Markdown
+### Step 2 — Get your brief as a Word file (.docx)
 
-Markdown (`.md`) is the **recommended, most reliable** format — the skill is built for it. Other formats *may* work, but Markdown is the safe, stable choice, so use it whenever you can.
+Word (`.docx`) is the **recommended, safe default** — download the Google Doc as Word and hand that to the agent.
 
-**Option 1 — download the whole brief (easiest):**
+> 💡 **Why Word, not Markdown?** Some briefs put the blog body **inside a table** in the Google Doc. When they do, downloading as Markdown can flatten that table and lose the headings and paragraphs — so the draft may come out wrong. Downloading as **Word (.docx)** keeps everything — headings, paragraphs, tables, bullet lists, and links — so it's the safer choice either way.
+
+**Download the whole brief as Word (do this):**
 1. Open the brief in **Google Docs**.
-2. **File → Download → Markdown (.md)**.
-3. It lands in your Downloads folder (e.g. `my-blog-brief.md`).
+2. **File → Download → Microsoft Word (.docx)**.
+3. It lands in your Downloads folder (e.g. `my-blog-brief.docx`). Hand that file to the agent.
 
-**Option 2 — copy just one section as Markdown:**
-1. **One-time setup:** turn Markdown on — **Tools → Preferences → tick "Enable Markdown" → OK**.
-2. Select the part of the doc you want.
-3. **Edit → Copy as Markdown** (or right-click → Copy as Markdown).
-4. Paste into any plain-text editor and save the file with a `.md` ending.
+**Alternative — Markdown (`.md`), for simple posts only:** the skill still accepts Markdown, and it's fine when the brief has no table around the body. To get it: **File → Download → Markdown (.md)**, *or* turn Markdown on (**Tools → Preferences → tick "Enable Markdown" → OK**) and use **Edit → Copy as Markdown**, then paste into a plain-text editor and save with a `.md` ending. When in doubt, use Word — it's the safer choice.
 
 ### Step 3 — Upload it
 
