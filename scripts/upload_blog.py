@@ -10,7 +10,7 @@ REST.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +33,13 @@ class UploadResult:
     post_url: str
     edit_url: str
     brand: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+
+# A keyword longer than this is almost certainly an un-delimited blob (e.g. a
+# space-joined CJK keyword cell), not a real tag -- skip it rather than create a
+# junk tag that permanently pollutes the client's WordPress taxonomy.
+_MAX_TAG_LEN = 50
 
 
 def upload_blog(
@@ -138,11 +145,28 @@ def _payload_to_parsed_doc(payload: dict) -> ParsedDoc:
     )
 
 
+def _apply_title_template(template: str, h1: str) -> str:
+    """Format the title template, tolerating a malformed stored template.
+
+    Only ``{h1}`` is supported. A template that references another placeholder
+    or contains stray braces would raise KeyError / IndexError mid-upload; fall
+    back to the raw H1 in that case rather than aborting the post.
+    """
+    try:
+        return template.format(h1=h1)
+    except (KeyError, IndexError, ValueError):
+        return h1
+
+
 def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
-    title = client_cfg.title_template.format(h1=doc.title or "Untitled")
+    warnings: list[str] = []
+    title = _apply_title_template(client_cfg.title_template, doc.title or "Untitled")
 
     creds = WPCredentials.load(client_cfg.wp_credentials_path)
     wp = WPClient(creds)
+
+    if not doc.body:
+        warnings.append("Brief produced an empty body — the draft has no content.")
 
     rendered = adapters.get(client_cfg.editor)(doc)
     content, extra_meta = _split_content(client_cfg.editor, rendered)
@@ -159,8 +183,15 @@ def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
             payload["categories"] = [cat_id]
 
     tag_names = list(client_cfg.default_tags) + doc.brief.keywords
-    if tag_names:
-        payload["tags"] = [wp.find_or_create_tag(t) for t in tag_names if t]
+    kept_tags = [t for t in tag_names if t and len(t) <= _MAX_TAG_LEN]
+    dropped = [t for t in tag_names if t and len(t) > _MAX_TAG_LEN]
+    if dropped:
+        warnings.append(
+            f"Skipped {len(dropped)} over-long keyword(s) (>{_MAX_TAG_LEN} chars) "
+            f"to avoid junk tags; add real tags by hand if needed."
+        )
+    if kept_tags:
+        payload["tags"] = [wp.find_or_create_tag(t) for t in kept_tags]
 
     if extra_meta:
         payload["meta"] = extra_meta
@@ -173,6 +204,7 @@ def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
         post_url=post.get("link", ""),
         edit_url=f"{creds.site_base}/wp-admin/post.php?post={post['id']}&action=edit",
         brand=doc.brand,
+        warnings=warnings,
     )
 
 

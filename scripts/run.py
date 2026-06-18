@@ -269,6 +269,7 @@ def _run_upload(args) -> int:
         "post_url": result.post_url,
         "edit_url": result.edit_url,
         "brand": result.brand,
+        "warnings": result.warnings,
     }, indent=2))
     return 0
 
@@ -313,6 +314,7 @@ def _run_upload_prepared(args) -> int:
         "post_url": result.post_url,
         "edit_url": result.edit_url,
         "brand": result.brand,
+        "warnings": result.warnings,
     }, indent=2))
     return 0
 
