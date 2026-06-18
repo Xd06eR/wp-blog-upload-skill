@@ -2,10 +2,10 @@
 
 The skill accepts two brief formats and auto-detects by suffix:
 
-  - ``.docx``  -> ``parse_docx`` (native Word reader). Reliable for the
-    FPD house template, where the article body is wrapped in a table cell
-    -- markdown export flattens that cell to one line, but the .docx keeps
-    every heading + paragraph, so the structure survives.
+  - ``.docx``  -> ``parse_docx`` (native Word reader). The safer default:
+    when a brief wraps the article body in a table cell, markdown export can
+    flatten that cell to one line, but the .docx keeps every heading +
+    paragraph, so the structure survives.
   - ``.md`` / anything else -> ``parse_md`` (the markdown parser). Fine for
     clean, non-table-wrapped briefs and the multi-brief ``### **Brand**``
     format.

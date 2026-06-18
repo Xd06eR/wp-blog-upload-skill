@@ -8,8 +8,8 @@ Two access layers (progressive disclosure) — this is the key design point:
   - INDEX  build_index() returns ONE compact record per client: a curated
            `summary` plus brand `aliases`. Cheap enough to load on EVERY run
            (see the `playbook-index` CLI subcommand). It lets the agent resolve
-           a brand the operator names ("ProKitchens") to the slug it actually
-           uploads under ("foodwork") BEFORE the client is chosen. A per-slug
+           a brand the operator names ("ExampleBrand") to the slug it actually
+           uploads under ("example-hub") BEFORE the client is chosen. A per-slug
            body read cannot do this — you would need the slug to find the
            mapping that gives you the slug (chicken-and-egg). Hybrid summary:
            the curated frontmatter `summary` when present, else the newest
@@ -25,8 +25,8 @@ bounded.
 
 File shape:
     ---
-    summary: ProKitchens (all langs) -> foodwork; one multilingual install.
-    aliases: prokitchens
+    summary: ExampleBrand (all langs) -> example-hub; one multilingual install.
+    aliases: examplebrand
     ---
     # Playbook — <slug>
 

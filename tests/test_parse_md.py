@@ -145,10 +145,10 @@ class BrandHeaderHashTest(unittest.TestCase):
     """H8: a brand header after a stray empty `### ` keeps a clean name."""
 
     def test_hash_not_pulled_into_brand_name(self) -> None:
-        text = "### \n\n### KitchenPark (AR)\n\n| Content Topic | x |\n| :- | :- |\n| **URL** | u |\n"
+        text = "### \n\n### BrandX (XX)\n\n| Content Topic | x |\n| :- | :- |\n| **URL** | u |\n"
         names = [b.brand for b in parse_md.list_briefs(_tmp_md(text))]
-        self.assertIn("KitchenPark (AR)", names)
-        self.assertNotIn("### KitchenPark (AR)", names)
+        self.assertIn("BrandX (XX)", names)
+        self.assertNotIn("### BrandX (XX)", names)
 
 
 def _tmp_md(text: str) -> str:

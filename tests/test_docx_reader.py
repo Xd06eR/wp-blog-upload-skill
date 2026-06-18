@@ -84,7 +84,7 @@ class DocxReaderTest(unittest.TestCase):
         self.assertFalse(doc.paragraphs[1].is_bold)
 
     def test_pstyle_exposed(self) -> None:
-        doc = self._read(_p(_r("ChefCollective"), style="Heading3"))
+        doc = self._read(_p(_r("BrandA"), style="Heading3"))
         self.assertEqual(doc.paragraphs[0].style, "Heading3")
 
     def test_is_list_item_detects_numpr(self) -> None:

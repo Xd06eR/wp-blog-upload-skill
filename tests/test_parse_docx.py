@@ -72,7 +72,7 @@ def _docx(body_xml: str, rels_xml: str = "") -> str:
     return tmp.name
 
 
-# A single-body house brief mirroring the real FPD export shape, including the
+# A single-body house brief mirroring the common house-template export shape, including the
 # boilerplate Heading3 sections that live OUTSIDE the body table (must NOT leak).
 def _house_body(body_cell_paras: str, *, title_cell: str = "IV.title",
                 meta_cell: str = "V.meta", client_url: str = "https://acme.example/") -> str:
@@ -316,13 +316,13 @@ class ParseDocxParagraphStreamTest(unittest.TestCase):
     def setUp(self) -> None:
         self._paths: list[str] = []
         body = (
-            _h3("ChefCollective (EN)")
-            + _p(_r("H1: Kitchen automation", bold=True))
-            + _p(_r("Intro for chef."))
+            _h3("BrandA (EN)")
+            + _p(_r("H1: Example Topic", bold=True))
+            + _p(_r("Intro for brand A."))
             + _p(_r("H2: Why automate", bold=True))
             + _p(_r("Because speed."))
-            + _h3("")  # empty placeholder brand (KitchenPark AR analog) -> skipped
-            + _h3("Freshlane (ZH)")
+            + _h3("")  # empty placeholder brand header (no body) -> skipped
+            + _h3("BrandB (ZH)")
             + _p(_r("H1: 廚房自動化", bold=True))
             + _p(_r("導言。"))
         )
@@ -335,35 +335,35 @@ class ParseDocxParagraphStreamTest(unittest.TestCase):
 
     def test_list_briefs_skips_empty_brand(self) -> None:
         briefs = parse_docx.list_briefs(self.path)
-        self.assertEqual([b.brand for b in briefs], ["ChefCollective (EN)", "Freshlane (ZH)"])
+        self.assertEqual([b.brand for b in briefs], ["BrandA (EN)", "BrandB (ZH)"])
 
     def test_no_brand_raises(self) -> None:
         with self.assertRaises(ParseError):
             parse_docx.parse(self.path)
 
     def test_select_brand_extracts_only_its_body(self) -> None:
-        doc = parse_docx.parse(self.path, brand="ChefCollective (EN)")
-        self.assertEqual(doc.title, "Kitchen automation")
+        doc = parse_docx.parse(self.path, brand="BrandA (EN)")
+        self.assertEqual(doc.title, "Example Topic")
         texts = " ".join(b.text for b in doc.body)
         self.assertIn("Because speed.", texts)
         self.assertNotIn("廚房自動化", texts)  # next brand's body must not bleed in
 
     def test_select_second_brand(self) -> None:
-        doc = parse_docx.parse(self.path, brand="Freshlane (ZH)")
+        doc = parse_docx.parse(self.path, brand="BrandB (ZH)")
         self.assertEqual(doc.title, "廚房自動化")
 
     def test_brand_with_body_but_no_h1_falls_back_to_brand_name(self) -> None:
-        # FR-style: body has H2/H3 but the H1 lives outside the stream.
+        # A body with H2/H3 but the H1 living outside the stream (a styled line).
         body = (
-            _h3("ProKitchens (FR)")
+            _h3("BrandC (FR)")
             + _p(_r("Intro sans titre."))
             + _p(_r("H2 : Une section", bold=True))
             + _p(_r("Corps."))
         )
         path = _docx(body)
         self._paths.append(path)
-        doc = parse_docx.parse(path, brand="ProKitchens (FR)")
-        self.assertEqual(doc.title, "ProKitchens (FR)")
+        doc = parse_docx.parse(path, brand="BrandC (FR)")
+        self.assertEqual(doc.title, "BrandC (FR)")
         self.assertEqual([b.kind for b in doc.body], ["paragraph", "h2", "paragraph"])
 
     def test_brand_with_no_body_raises(self) -> None:

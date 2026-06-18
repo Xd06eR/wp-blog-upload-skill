@@ -1,13 +1,13 @@
 """Parse a .docx SEO brief into the same ParsedDoc the markdown path uses.
 
-The content team wraps the article body in a Word table cell. Markdown
-export flattens that cell to one line (structure lost); the .docx keeps
+Some briefs wrap the article body inside a Word table cell. Markdown
+export can flatten that cell to one line (structure lost); the .docx keeps
 every heading + paragraph as a separate ``<w:p>`` inside the ``<w:tc>``.
 This module reads the .docx natively (via ``docx_reader``) and emits the
 exact ``Brief`` / ``Block`` / ``ParsedDoc`` shapes ``parse_md`` produces,
 so the renderer + uploader downstream are unchanged.
 
-FPD "house template" layout (each field is its own table, labelled by its
+Common house-template layout (each field is its own table, labelled by its
 first cell):
 
     | Date | ... |                         <- generic header  (skipped)
@@ -75,8 +75,8 @@ def _brand_markers(doc: docx_reader.Document) -> list[tuple[int, str]]:
     """Paragraph-stream brand headers: non-empty ``Heading3`` blocks.
 
     Returns (block_index, brand_name) for each. Empty Heading3 paragraphs
-    (placeholder brands like KitchenPark AR / KitchenBASE JP in the real
-    briefs) are skipped — they carry no body.
+    (placeholder brand headers a writer left without a body) are skipped —
+    they carry no content to upload.
     """
     out: list[tuple[int, str]] = []
     for i, block in enumerate(doc.blocks):

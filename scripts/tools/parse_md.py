@@ -92,7 +92,7 @@ class ParseError(Exception):
 # `[` is excluded from the captured group.
 # `#` is excluded from the captured name so a brand header preceded by a stray
 # empty `### ` line can't pull the leftover hashes into the name (the bug that
-# produced a brand literally called `### KitchenPark (AR)`).
+# produced a brand literally called `### BrandName (XX)`).
 _CLIENT_HEADER = re.compile(
     r"^###\s+(?:\*\*\s*([^\[\]\n*#]+?)\s*\*\*|([^\[\]\n*#][^\[\]\n*#]*?))\s*$",
     re.MULTILINE,
