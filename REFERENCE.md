@@ -297,7 +297,7 @@ append_lesson(
 )
 ```
 
-To curate the index line **without** adding a dated entry (e.g. backfill a mapping onto a legacy playbook), use `set_meta(slug, summary=..., aliases=[...])`; aliases merge by default (`replace_aliases=True` to overwrite).
+To curate the index line **without** adding a dated entry (e.g. backfill a mapping onto a legacy playbook), use `set_meta(slug, summary=..., aliases=[...])`; aliases merge by default (`replace_aliases=True` to overwrite). `summary` is capped at 200 chars and must be single-line; `aliases` entries containing a comma are rejected (comma is the frontmatter delimiter).
 
 Entries are dated `## YYYY-MM-DD — headline`. The live file holds the most recent 5 entries; older ones rotate to `<slug>.archive.md`. Frontmatter is preserved across rotation.
 

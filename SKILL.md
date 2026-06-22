@@ -222,6 +222,8 @@ append_lesson(slug='example-hub',
 "
 ```
 
+**Index-field constraints:** `summary` is capped at 200 chars and must be single-line (it loads on every run — write it concise); each `aliases` entry must not contain a comma, the frontmatter delimiter — a comma-alias is silently dropped.
+
 To fix an index line *without* adding a dated entry, call `set_meta(slug, summary='...', aliases=[...])` instead of `append_lesson`.
 
 ## Hard rules
