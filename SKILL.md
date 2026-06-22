@@ -82,7 +82,7 @@ PYTHONPATH=<skill-dir> python3 -B -m scripts.run onboard --from-file $WS/data/se
 
 Re-onboarding the *same* site (same root, new credentials) is allowed — that's a refresh, not a collision.
 
-**URL tolerance:** the CLI normalizes `site_url` on entry. Operators can paste any of these and the same clean root is stored: `https://client.com`, `https://client.com/`, `https://client.com/wp-admin`, `https://client.com/wp-login.php`. Sub-directory installs like `https://client.com/blog` (and a site that genuinely lives under `/admin`) are left alone.
+**URL tolerance:** the CLI normalizes `site_url` on entry. Operators can paste any of these and the same clean root is stored: `https://client.com`, `https://client.com/`, `https://client.com/wp-admin`, `https://client.com/wp-login.php`. Sub-directory installs like `https://client.com/blog` (and a site that genuinely lives under `/admin`) are left alone. An explicit `http://` URL is **refused** at onboarding — the app-password would travel in cleartext over basic auth; use `https://` (or `http://localhost` / `127.0.0.1` for a local dev site).
 
 **Security:** NEVER `cat` or `Read` `_pending.json` yourself. Only the CLI handles it.
 

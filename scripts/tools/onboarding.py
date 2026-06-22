@@ -43,6 +43,29 @@ def derive_display_name(site_url: str) -> str:
     return host.replace("www.", "")
 
 
+def _assert_https(site_url: str) -> None:
+    """Refuse an ``http://`` site URL — the WP app-password would travel in
+    cleartext over basic auth. Every real client site is https; an ``http://``
+    URL is either a typo (forgot the ``s``) or a non-TLS host.
+
+    ``https://`` and scheme-less URLs (``derive_slug`` treats bare hostnames as
+    https) pass. ``http://localhost``, ``127.0.0.1``, ``::1``, and ``*.local``
+    are exempt as dev hosts where the operator already knows it's cleartext.
+    """
+    lowered = site_url.lower()
+    if not lowered.startswith("http://"):
+        return
+    host = (urlparse(lowered).hostname or "").lstrip("[")
+    if host in ("localhost", "127.0.0.1", "::1") or host.endswith(".local"):
+        return
+    raise ValueError(
+        f"Refusing http:// site URL '{site_url}': the WordPress app-password would "
+        f"travel in cleartext over basic auth. Use https:// instead (if you pasted "
+        f"http:// by mistake, re-onboard with the https:// URL). For a local dev "
+        f"site, use http://localhost or http://127.0.0.1."
+    )
+
+
 def client_exists(slug: str) -> bool:
     return get_store().exists(slug)
 
@@ -67,6 +90,8 @@ def register_client(
     # Normalize once at the entry point so every downstream artifact (creds
     # JSON, DB row, editor probe, REST calls) shares the same clean site root.
     site_url = _normalize_site_root(site_url)
+    # Refuse http:// before any network call sends the app-password in cleartext.
+    _assert_https(site_url)
 
     # Slug-collision guard: refuse to silently overwrite a DIFFERENT client that
     # already derived the same slug (two sites sharing a domain head). The

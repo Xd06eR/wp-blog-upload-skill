@@ -33,6 +33,26 @@ class NormalizeSiteRootTest(unittest.TestCase):
         self.assertEqual(_normalize_site_root("https://x.com/blog/"), "https://x.com/blog")
 
 
+class HttpsGuardTest(unittest.TestCase):
+    """L4: refuse http:// site URLs — basic auth would leak the app-password in cleartext."""
+
+    def test_http_refused_for_nonlocalhost(self) -> None:
+        from scripts.tools.onboarding import _assert_https
+        for url in ("http://acme.com", "http://acme.com/wp-admin", "http://10.0.0.1"):
+            with self.subTest(url=url):
+                with self.assertRaises(ValueError) as ctx:
+                    _assert_https(url)
+                self.assertIn("cleartext", str(ctx.exception).lower())
+
+    def test_https_dev_and_schemeless_allowed(self) -> None:
+        from scripts.tools.onboarding import _assert_https
+        for url in ("https://acme.com", "https://acme.com/wp-admin",
+                    "http://localhost", "http://127.0.0.1", "http://site.local",
+                    "acme.com"):  # scheme-less — derive_slug treats as https
+            with self.subTest(url=url):
+                _assert_https(url)  # must not raise
+
+
 class DetectEditorHonestyTest(unittest.TestCase):
     """H3: detect_editor reports whether it actually detected vs defaulted."""
 
