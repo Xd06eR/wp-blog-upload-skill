@@ -138,7 +138,7 @@ All commands run with `PYTHONPATH=<skill-dir> python3 -B -m scripts.run`, where 
 | `upload --client <slug> --doc <path> [--brand <name>] [--media-dir <dir>]` | Parse + render + POST as draft (`.docx` / `.md` auto-detected). `--media-dir` uploads every image in the folder (name-sorted), appends them to the body, and sets the first as the featured image | JSON: `{title, post_id, post_url, edit_url, brand, warnings, media}` |
 | `upload-prepared --client <slug> --from-file <payload.json>` | Render + POST from agent-emitted ParsedDoc JSON (bypasses the brief parser) | Same as `upload` |
 
-`.docx` briefs are parsed natively — there is no normalize step, and `inspect-brief` does not apply to them. `warnings` is an array of non-fatal advisories (empty-body, skipped over-long keyword, defaulted-editor); empty when the run was clean.
+`.docx` briefs are parsed natively — there is no normalize step, and `inspect-brief` does not apply to them. `warnings` is an array of non-fatal advisories (empty-body, defaulted-editor); empty when the run was clean.
 
 Non-zero exit codes: `1` runtime failure, `2` bad argument.
 
@@ -210,7 +210,7 @@ The brief body has already been approved by the writer. The agent's job is *stru
 | `brief.meta_title` | recommended | Surfaced in adapter comment for the writer (Yoast / RankMath fill) |
 | `brief.meta_description` | recommended | Same as `meta_title` |
 | `brief.word_count` | no | Informational |
-| `brief.keywords` | recommended | Sent to WP as post tags (merged with the client's `default_tags`) via `find_or_create_tag`; an over-long blob (>50 chars) is skipped as a tag at upload (with a warning) to avoid junk WP tags |
+| `brief.keywords` | recommended | Surfaced in the hidden TODO-META comment for the writer to set as Yoast / RankMath keyphrases by hand; **not** auto-tagged. WP post tags come only from the client's `default_tags` |
 | `brief.target_audience` | no | Informational |
 | `body[].kind` | **yes** | One of `h1`, `h2`, `h3`, `h4`, `paragraph`, `list`, `table`, `image` |
 | `body[].text` | required when kind is a heading or `paragraph` | May contain inline HTML (`<a>`, `<strong>`) |
@@ -219,7 +219,7 @@ The brief body has already been approved by the writer. The agent's job is *stru
 | `body[].src` | required when kind == `image` | Local file path; uploaded to the WP media library at POST time. The first image in the body becomes the post's `featured_media` |
 | `body[].alt` | optional (image) | Alt text; defaults to empty |
 
-The CLI validates the shape and exits `2` on missing required fields or unknown `kind` values. Body `h1` blocks are demoted to `<h2>` by the adapters because WP already uses the post title as `<h1>`. On success the `UploadResult` (stdout JSON) carries a `warnings` array — non-fatal advisories such as an empty body or skipped over-long keyword; empty on a clean run. Image blocks are uploaded to the WP media library at POST time; the result JSON also carries a `media` array of the uploaded `{id, url}` and the first image is set as `featured_media`.
+The CLI validates the shape and exits `2` on missing required fields or unknown `kind` values. Body `h1` blocks are demoted to `<h2>` by the adapters because WP already uses the post title as `<h1>`. On success the `UploadResult` (stdout JSON) carries a `warnings` array — non-fatal advisories such as an empty body or a defaulted editor; empty on a clean run. Image blocks are uploaded to the WP media library at POST time; the result JSON also carries a `media` array of the uploaded `{id, url}` and the first image is set as `featured_media`.
 
 ## Onboarding flow
 

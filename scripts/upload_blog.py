@@ -37,11 +37,6 @@ class UploadResult:
     media: list[dict] = field(default_factory=list)
 
 
-# A keyword longer than this is almost certainly an un-delimited blob (e.g. a
-# space-joined CJK keyword cell), not a real tag -- skip it rather than create a
-# junk tag that permanently pollutes the client's WordPress taxonomy.
-_MAX_TAG_LEN = 50
-
 
 def upload_blog(
     doc_path: str | Path,
@@ -242,16 +237,13 @@ def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
         if cat_id:
             payload["categories"] = [cat_id]
 
-    tag_names = list(client_cfg.default_tags) + doc.brief.keywords
-    kept_tags = [t for t in tag_names if t and len(t) <= _MAX_TAG_LEN]
-    dropped = [t for t in tag_names if t and len(t) > _MAX_TAG_LEN]
-    if dropped:
-        warnings.append(
-            f"Skipped {len(dropped)} over-long keyword(s) (>{_MAX_TAG_LEN} chars) "
-            f"to avoid junk tags; add real tags by hand if needed."
-        )
-    if kept_tags:
-        payload["tags"] = [wp.find_or_create_tag(t) for t in kept_tags]
+    # Tags come only from the client's curated default_tags. The brief's
+    # Keywords are deliberately NOT auto-tagged: one-off keyphrases pollute the
+    # WP tag taxonomy. They still surface in the hidden TODO-META comment for
+    # the writer to set as Yoast keyphrases by hand.
+    tag_ids = [wp.find_or_create_tag(t) for t in client_cfg.default_tags if t]
+    if tag_ids:
+        payload["tags"] = tag_ids
 
     if extra_meta:
         payload["meta"] = extra_meta

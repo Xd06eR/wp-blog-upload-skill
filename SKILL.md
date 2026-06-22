@@ -176,7 +176,7 @@ PYTHONPATH=<skill-dir> python3 -B -m scripts.run upload \
   --brand "<Brand or section label exactly as list-briefs reported>"
 ```
 
-Drop `--brand` if the file has a single section. Stdout includes a `warnings` array — **surface any warnings to the operator** (e.g. "empty body", "skipped over-long keyword", a defaulted editor). An empty-body or missing-H1 brief fails with a clear error rather than posting a blank draft.
+Drop `--brand` if the file has a single section. Stdout includes a `warnings` array — **surface any warnings to the operator** (e.g. "empty body", a defaulted editor). An empty-body or missing-H1 brief fails with a clear error rather than posting a blank draft.
 
 **Images (optional).** If the operator also provides image files (commonly a separate folder — briefs rarely embed placeable images), add `--media-dir` to upload them. Every image in the folder is uploaded in filename order, appended to the body, and the **first becomes the featured image**:
 

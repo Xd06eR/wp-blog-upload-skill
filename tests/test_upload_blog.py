@@ -111,17 +111,19 @@ class UploadGuardTest(unittest.TestCase):
         r = self._run(_cfg(), _doc())
         self.assertEqual(r.warnings, [])
 
-    # H7-downstream --------------------------------------------------------
-    def test_overlong_keyword_skipped_as_tag(self) -> None:
-        junk = "x " * 40  # ~80 chars, an un-delimited blob
+    # Tags -----------------------------------------------------------------
+    def test_keywords_are_not_tagged(self) -> None:
+        # Brief Keywords must never become WP tags -- not even clean short
+        # ones -- and must raise no tag-related warning.
+        junk = "x " * 40  # ~80 chars; old code would have warned + skipped this
         r = self._run(_cfg(), _doc(keywords=[junk, "real tag"]))
-        # only the real tag became a WP tag
-        self.assertEqual(self.wp.created_payload["tags"], [1])
-        self.assertTrue(any("over-long keyword" in w for w in r.warnings))
+        self.assertNotIn("tags", self.wp.created_payload)
+        self.assertEqual(r.warnings, [])
 
-    def test_normal_keywords_all_kept(self) -> None:
-        r = self._run(_cfg(), _doc(keywords=["alpha", "beta"]))
-        self.assertEqual(len(self.wp.created_payload["tags"]), 2)
+    def test_default_tags_still_applied(self) -> None:
+        # The client's curated default_tags survive; brief keywords are ignored.
+        r = self._run(_cfg(default_tags=["brand"]), _doc(keywords=["alpha", "beta"]))
+        self.assertEqual(self.wp.created_payload["tags"], [1])
         self.assertEqual(r.warnings, [])
 
     def test_status_is_always_draft(self) -> None:
