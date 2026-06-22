@@ -103,9 +103,14 @@ class UploadGuardTest(unittest.TestCase):
         self.assertEqual(r.title, "Hello")
 
     # M6 -------------------------------------------------------------------
-    def test_empty_body_warns(self) -> None:
-        r = self._run(_cfg(), _doc(body=[]))
-        self.assertTrue(any("empty body" in w for w in r.warnings))
+    def test_empty_body_raises_not_warns(self) -> None:
+        # An empty body must fail loud (ValueError), NOT post a blank draft.
+        # SKILL.md contract: "fails with a clear error rather than posting a
+        # blank draft." Both the .docx/.md and upload-prepared paths route
+        # through _post_parsed_doc, so the guard here covers both.
+        with self.assertRaises(ValueError) as ctx:
+            self._run(_cfg(), _doc(body=[]))
+        self.assertIn("empty body", str(ctx.exception).lower())
 
     def test_non_empty_body_no_warning(self) -> None:
         r = self._run(_cfg(), _doc())

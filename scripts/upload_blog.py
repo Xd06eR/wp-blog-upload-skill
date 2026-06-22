@@ -219,7 +219,14 @@ def _post_parsed_doc(doc: ParsedDoc, client_cfg: ClientConfig) -> UploadResult:
     doc, featured_media = _resolve_media(doc, wp, warnings)
 
     if not doc.body:
-        warnings.append("Brief produced an empty body — the draft has no content.")
+        # Fail loud, don't post a blank draft. SKILL.md promises "fails with a
+        # clear error"; both the .docx/.md and upload-prepared paths route
+        # through here, and parse_docx's own empty-body guard doesn't cover
+        # upload-prepared (body: [] reaches _post_parsed_doc unchecked).
+        raise ValueError(
+            "Brief produced an empty body — refusing to post a blank draft. "
+            "Check the brief's body content parses to at least one block before uploading."
+        )
 
     rendered = adapters.get(client_cfg.editor)(doc)
     content, extra_meta = _split_content(client_cfg.editor, rendered)

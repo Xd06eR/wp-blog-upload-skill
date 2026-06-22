@@ -138,7 +138,7 @@ All commands run with `PYTHONPATH=<skill-dir> python3 -B -m scripts.run`, where 
 | `upload --client <slug> --doc <path> [--brand <name>] [--media-dir <dir>]` | Parse + render + POST as draft (`.docx` / `.md` auto-detected). `--media-dir` uploads every image in the folder (name-sorted), appends them to the body, and sets the first as the featured image | JSON: `{title, post_id, post_url, edit_url, brand, warnings, media}` |
 | `upload-prepared --client <slug> --from-file <payload.json>` | Render + POST from agent-emitted ParsedDoc JSON (bypasses the brief parser) | Same as `upload` |
 
-`.docx` briefs are parsed natively — there is no normalize step, and `inspect-brief` does not apply to them. `warnings` is an array of non-fatal advisories (empty-body, defaulted-editor); empty when the run was clean.
+`.docx` briefs are parsed natively — there is no normalize step, and `inspect-brief` does not apply to them. `warnings` is an array of non-fatal advisories (e.g. a defaulted editor); empty when the run was clean. An empty body or missing H1 is a hard error (the run aborts), not a warning.
 
 Non-zero exit codes: `1` runtime failure, `2` bad argument.
 
