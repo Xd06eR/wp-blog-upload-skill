@@ -257,7 +257,7 @@ All three:
 - Render in-body `table` blocks as real `<table>` markup (not flattened text)
 - Render `image` blocks as the editor's native image markup (Gutenberg `wp:image`, Classic/Elementor `<figure><img>`), referencing the file's WP media URL + id after upload; the first image in the body is set as the post's `featured_media`
 - Inject a hidden `<!-- TODO META FOR HUMAN: ... -->` comment at the top with the meta title, meta description, target URL, and keywords from the brief (Elementor adds a layout-check note), so the writer remembers to fill Yoast / RankMath. Fields interpolated into that comment are injection-safe: a literal `-->` in a value is neutralized so it can't close the comment early
-- Escape literal text spans while preserving recognized inline tags — the inline `<a>` / `<strong>` from the parsers pass through, and only the text between them is `html.escape`-d
+- Escape literal text spans while preserving recognized inline tags — the inline `<a>` / `<strong>` from the parsers pass through, and only the text between them is `html.escape`-d. Unsafe `<a href>` schemes (`javascript:`, `data:`, `vbscript:`, ...) are stripped — WP bypasses `wp_kses` for Editor/Admin (`unfiltered_html`), so the skill sanitizes its own output; the `<a>` tag and link text survive, only the `href` is dropped
 
 The editor is selected per-client from `clients.editor`. Onboarding auto-detects it.
 

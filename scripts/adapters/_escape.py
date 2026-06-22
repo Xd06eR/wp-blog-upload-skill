@@ -27,6 +27,15 @@ _INLINE_TAG = re.compile(
 # never double-escaped (`&amp;` must not become `&amp;amp;`).
 _BARE_AMP = re.compile(r"&(?!#?\w+;)")
 
+# href attribute inside an <a> tag (parsers emit double-quoted hrefs). Used to
+# neutralize dangerous URL schemes — see `_sanitize_a_href`.
+_HREF_ATTR = re.compile(r'\s+href\s*=\s*"([^"]*)"', re.IGNORECASE)
+# A leading `scheme:` on a URL. A URL is treated as unsafe if it carries a
+# scheme NOT in `_SAFE_SCHEMES`; scheme-less URLs (relative paths, `#anchor`)
+# have no scheme and pass through.
+_SCHEME = re.compile(r"^([a-z][a-z0-9+.\-]*):", re.IGNORECASE)
+_SAFE_SCHEMES = {"http", "https", "mailto", "tel"}
+
 
 def _escape_text(text: str) -> str:
     """Escape a literal text span: bare `&` then the angle brackets."""
@@ -42,13 +51,37 @@ def _escape_attr(text: str) -> str:
     return _escape_text(text).replace('"', "&quot;")
 
 
+def _sanitize_a_href(tag: str) -> str:
+    """Strip an unsafe href (``javascript:``, ``data:``, ``vbscript:``, ...) from an ``<a>`` tag.
+
+    WP bypasses ``wp_kses`` for Editor/Admin (``unfiltered_html``), so the skill
+    must sanitize brief-sourced URLs itself rather than rely on WP. Safe schemes
+    (http/https/mailto/tel) and scheme-less URLs (relative paths, anchors) pass
+    through unchanged; only the ``href`` attribute is dropped on an unsafe URL —
+    the ``<a>`` tag and its link text always survive.
+    """
+    m = _HREF_ATTR.search(tag)
+    if not m:
+        return tag
+    scheme = _SCHEME.match(m.group(1).strip())
+    if scheme is None or scheme.group(1).lower() in _SAFE_SCHEMES:
+        return tag
+    return tag[:m.start()] + tag[m.end():]  # drop the href attr, keep the tag
+
+
 def escape_inline(text: str) -> str:
-    """Escape literal text spans but leave recognized inline HTML tags intact."""
+    """Escape literal text spans but leave recognized inline HTML tags intact.
+
+    Unsafe ``<a href>`` schemes are stripped (see ``_sanitize_a_href``).
+    """
     out: list[str] = []
     last = 0
     for m in _INLINE_TAG.finditer(text):
         out.append(_escape_text(text[last:m.start()]))
-        out.append(_BARE_AMP.sub("&amp;", m.group(0)))  # fix bare & in href, keep tag
+        tag = m.group(0)
+        if tag.lower().startswith("<a"):  # opening anchor — sanitize its href
+            tag = _sanitize_a_href(tag)
+        out.append(_BARE_AMP.sub("&amp;", tag))  # fix bare & in href, keep tag
         last = m.end()
     out.append(_escape_text(text[last:]))
     return "".join(out)

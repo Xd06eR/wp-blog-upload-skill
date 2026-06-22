@@ -72,6 +72,20 @@ class EscapeInlineTest(unittest.TestCase):
     def test_existing_entity_not_double_escaped(self) -> None:
         self.assertEqual(escape_inline("a &amp; b"), "a &amp; b")
 
+    def test_unsafe_href_scheme_stripped(self) -> None:
+        # javascript:/data:/vbscript: URLs must not reach the draft — WP bypasses
+        # kses for Editor/Admin (unfiltered_html), so the skill sanitizes itself.
+        for url in ("javascript:alert(1)", "data:text/plain;base64,WF", "vbscript:foo"):
+            out = escape_inline(f'click <a href="{url}">here</a> after')
+            self.assertNotIn(url, out, f"unsafe URL leaked: {url}")
+            self.assertIn("here</a>", out)   # link text + closing tag survive
+            self.assertNotIn("href=", out)   # href attr stripped, not rewritten
+
+    def test_safe_href_schemes_kept(self) -> None:
+        for url in ("https://x.com/a", "http://x.com", "mailto:a@x.com",
+                    "/relative/path", "#anchor"):
+            self.assertIn(f'href="{url}"', escape_inline(f'<a href="{url}">x</a>'))
+
 
 class AdapterEscapingTest(unittest.TestCase):
     """The C3 bug end-to-end: a block mixing a link with raw & must not ship raw &."""
