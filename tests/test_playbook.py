@@ -142,6 +142,36 @@ class PlaybookTest(unittest.TestCase):
         self.assertEqual(meta["summary"], "s")
         self.assertFalse(body.startswith("\n"))  # no leading blank-line buildup
 
+    # --- integrity: atomic writes, summary bound, alias delimiter ------------
+
+    def test_atomic_write_leaves_original_intact_on_failure(self) -> None:
+        # A crash mid-replace must never truncate an existing playbook.
+        playbook.set_meta("iota", summary="original")
+        path = playbook._slug_path("iota")
+        with mock.patch.object(playbook.os, "replace", side_effect=OSError("disk gone")):
+            with self.assertRaises(OSError):
+                playbook._atomic_write(path, "NEW CONTENT THAT MUST NOT LAND")
+        # original file untouched, no temp left behind
+        self.assertEqual(path.read_text(encoding="utf-8").splitlines()[0]
+                         if path.exists() else "", "---")
+        self.assertNotIn("NEW CONTENT", playbook.read("iota"))
+        leftover = [p for p in path.parent.glob(".tmp-*")]
+        self.assertEqual(leftover, [])
+
+    def test_summary_is_bounded_and_single_line(self) -> None:
+        playbook.set_meta("kappa", summary="x" * 500 + "\n## injected")
+        meta, _ = playbook._parse_frontmatter(playbook.read("kappa"))
+        self.assertLessEqual(len(meta["summary"]), playbook.MAX_SUMMARY_LEN)
+        self.assertNotIn("\n", meta["summary"])     # newline can't inject a key
+        self.assertNotIn("injected", meta["summary"])  # second line not swallowed as a fact
+
+    def test_comma_alias_rejected(self) -> None:
+        # Comma is the alias CSV delimiter; a comma-alias would split into two
+        # bogus tokens and silently corrupt brand->slug recall.
+        playbook.set_meta("lambda", aliases=["good", "bad,one"])
+        meta, _ = playbook._parse_frontmatter(playbook.read("lambda"))
+        self.assertEqual(meta["aliases"], ["good"])
+
 
 if __name__ == "__main__":
     unittest.main()

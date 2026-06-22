@@ -41,13 +41,49 @@ comma-separated list.
 
 from __future__ import annotations
 
+import os
 import re
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
 from . import workspace
 
 MAX_LIVE_ENTRIES = 5
+# The always-loaded index pays `len(summary)` on every run, so cap it. Also
+# the fallback headline path caps at 120; the curated path must stay bounded
+# too or one verbose set_meta bloats every future run.
+MAX_SUMMARY_LEN = 200
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Write `text` to `path` atomically: stage a temp file, fsync, then rename.
+
+    A crash or a concurrent run mid-write must never truncate an existing
+    playbook (silent memory corruption). `os.replace` is atomic on POSIX and
+    best-effort on Windows. UTF-8 is forced so CJK summaries survive a
+    cross-platform (Linux write -> Windows read) round-trip.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-", suffix=".md")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _clean_summary(s: str) -> str:
+    """Bound + single-line a summary so it can't bloat the index or inject a
+    spurious frontmatter key via a newline."""
+    return s.strip().replace("\n", " ").replace("\r", " ")[:MAX_SUMMARY_LEN]
 
 _ENTRY_HEADER = re.compile(r"^## \d{4}-\d{2}-\d{2}", re.MULTILINE)
 _HEADLINE = re.compile(r"^## \d{4}-\d{2}-\d{2}\s*[—–-]\s*(.+?)\s*$", re.MULTILINE)
@@ -118,11 +154,18 @@ def _serialize_frontmatter(meta: dict) -> str:
 
 
 def _merge_aliases(existing: list[str], new: list[str]) -> list[str]:
-    """Append new aliases, case-insensitively de-duplicated, order preserved."""
+    """Append new aliases, case-insensitively de-duplicated, order preserved.
+
+    A comma is rejected: it is the frontmatter CSV delimiter, so a comma-alias
+    would split into two bogus tokens on the next read and silently corrupt
+    brand->slug recall. Aliases are short lookup tokens, never comma phrases.
+    """
     merged = list(existing)
     seen = {a.lower() for a in merged}
     for a in new:
         a = a.strip()
+        if "," in a:
+            continue
         if a and a.lower() not in seen:
             merged.append(a)
             seen.add(a.lower())
@@ -147,7 +190,7 @@ def _default_header(slug: str) -> str:
 def read(slug: str) -> str:
     """Return the full live playbook (frontmatter + journal), or empty string."""
     path = _slug_path(slug)
-    return path.read_text() if path.exists() else ""
+    return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
 def build_index() -> list[dict]:
@@ -165,7 +208,7 @@ def build_index() -> list[dict]:
     for path in sorted(pdir.glob("*.md")):
         if path.name.endswith(".archive.md"):
             continue
-        meta, body = _parse_frontmatter(path.read_text())
+        meta, body = _parse_frontmatter(path.read_text(encoding="utf-8"))
         summary = (meta.get("summary") or "").strip()
         source = "summary"
         if not summary:
@@ -196,18 +239,18 @@ def set_meta(
     pass replace_aliases=True to overwrite.
     """
     path = _slug_path(slug)
-    existing = path.read_text() if path.exists() else ""
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
     meta, body = _parse_frontmatter(existing)
     if summary is not None:
-        meta["summary"] = summary.strip()
+        meta["summary"] = _clean_summary(summary)
     if aliases is not None:
         meta["aliases"] = (
-            [a.strip() for a in aliases if a.strip()] if replace_aliases
+            [a.strip() for a in aliases if "," not in a and a.strip()] if replace_aliases
             else _merge_aliases(meta.get("aliases", []), aliases)
         )
     if not body.strip():
         body = _default_header(slug)
-    path.write_text(_serialize_frontmatter(meta) + body)
+    _atomic_write(path, _serialize_frontmatter(meta) + body)
     return path
 
 
@@ -232,11 +275,11 @@ def append_lesson(
     body_clean = body.strip() if body else "(no lesson recorded)"
     new_entry = f"## {today} — {headline_clean}\n\n{body_clean}\n"
 
-    existing = path.read_text() if path.exists() else ""
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
     meta, existing_body = _parse_frontmatter(existing)
 
     if summary is not None:
-        meta["summary"] = summary.strip()
+        meta["summary"] = _clean_summary(summary)
     if aliases is not None:
         meta["aliases"] = _merge_aliases(meta.get("aliases", []), aliases)
 
@@ -246,7 +289,7 @@ def append_lesson(
         journal = _default_header(slug) + new_entry
 
     journal = _rotate(slug, journal)
-    path.write_text(_serialize_frontmatter(meta) + journal)
+    _atomic_write(path, _serialize_frontmatter(meta) + journal)
     return path
 
 
@@ -268,9 +311,11 @@ def _rotate(slug: str, content: str) -> str:
     if archive_chunk:
         archive_path = _slug_path(slug, archive=True)
         prior_archive = (
-            archive_path.read_text() if archive_path.exists()
+            archive_path.read_text(encoding="utf-8") if archive_path.exists()
             else f"# Playbook archive — {slug}\n\nOldest first.\n\n"
         )
-        archive_path.write_text(prior_archive.rstrip() + "\n\n" + archive_chunk + "\n")
+        _atomic_write(
+            archive_path, prior_archive.rstrip() + "\n\n" + archive_chunk + "\n"
+        )
 
     return header + "\n\n" + live_chunk + "\n"
