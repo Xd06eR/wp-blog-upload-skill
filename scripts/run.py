@@ -211,7 +211,7 @@ def _run_onboard(args) -> int:
 
 
 def _run_list_briefs(args) -> int:
-    from .tools import parse_md
+    from .tools import parse_md, docx_reader
     from .tools.intake import parser_for
     doc_path = Path(args.doc).expanduser().resolve()
     if not doc_path.exists():
@@ -219,7 +219,7 @@ def _run_list_briefs(args) -> int:
         return 2
     try:
         briefs = parser_for(doc_path).list_briefs(doc_path)
-    except parse_md.ParseError as e:
+    except (parse_md.ParseError, docx_reader.DocxError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
     print(json.dumps([asdict(b) for b in briefs], indent=2))
