@@ -74,14 +74,25 @@ def _body_tables(doc: docx_reader.Document) -> list[docx_reader.Table]:
 def _brand_markers(doc: docx_reader.Document) -> list[tuple[int, str]]:
     """Paragraph-stream brand headers: non-empty ``Heading3`` blocks.
 
-    Returns (block_index, brand_name) for each. Empty Heading3 paragraphs
-    (placeholder brand headers a writer left without a body) are skipped —
-    they carry no content to upload.
+    Returns (block_index, brand_name) for each. Skipped:
+      - Empty Heading3 paragraphs (placeholder brand headers a writer left
+        without a body) — they carry no content to upload.
+      - Heading3 paragraphs whose text is a typed body heading (``H1:`` /
+        ``H2:`` / ``H3:`` …). A brand's body heading can itself carry the
+        Heading3 paragraph style (a Word / Google-Docs export quirk); without
+        this guard it would be mistaken for a brand marker, inventing a
+        phantom brand and truncating the real brand's body at its first
+        heading.
     """
     out: list[tuple[int, str]] = []
     for i, block in enumerate(doc.blocks):
-        if isinstance(block, docx_reader.Para) and block.style == "Heading3" and block.text.strip():
-            out.append((i, block.text.strip()))
+        if not (isinstance(block, docx_reader.Para)
+                and block.style == "Heading3"
+                and block.text.strip()):
+            continue
+        if _HEADING_RE.match(block.text.strip()):
+            continue
+        out.append((i, block.text.strip()))
     return out
 
 

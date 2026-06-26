@@ -102,6 +102,71 @@ class DocxReaderTest(unittest.TestCase):
         self.assertEqual(para.html, 'Visit <a href="https://x.com/p?a=1&b=2">our shop</a>')
         self.assertIn("our shop", para.text)  # label still in plain text
 
+    def test_hyperlink_leading_space_hoisted_out_of_anchor(self) -> None:
+        # Google Docs sometimes exports the separating space as a run INSIDE the
+        # hyperlink. It must render BEFORE the <a>, not inside the link text, or
+        # the link glues to the previous word (invisible in CJK, broken in English).
+        body = _p(
+            _r("An"),
+            f'<w:hyperlink r:id="rId7">{_r(" ")}{_r("ABN page")}</w:hyperlink>',
+        )
+        rels = '<Relationship Id="rId7" Target="https://x.com/abn"/>'
+        para = self._read(body, rels).paragraphs[0]
+        self.assertEqual(para.html, 'An <a href="https://x.com/abn">ABN page</a>')
+
+    def test_hyperlink_trailing_space_hoisted_out_of_anchor(self) -> None:
+        body = _p(
+            f'<w:hyperlink r:id="rId7">{_r("ABN page")}{_r(" ")}</w:hyperlink>',
+            _r("is required"),
+        )
+        rels = '<Relationship Id="rId7" Target="https://x.com/abn"/>'
+        para = self._read(body, rels).paragraphs[0]
+        self.assertEqual(para.html, '<a href="https://x.com/abn">ABN page</a> is required')
+
+    def test_sdt_wrapped_paragraph_is_captured(self) -> None:
+        # Word wraps a paragraph in <w:sdt> (a content control / structured tag)
+        # when one is applied -- common on headings. read() must descend into
+        # <w:sdtContent>, or the whole control is skipped and its text silently
+        # vanishes (real bug: lost every heading in a content-control'd brief).
+        body = (
+            _p(_r("Intro paragraph"))
+            + f"<w:sdt><w:sdtPr/><w:sdtContent>{_p(_r('H3: 2. A Heading'))}</w:sdtContent></w:sdt>"
+            + _p(_r("Body after heading"))
+        )
+        texts = [p.text for p in self._read(body).paragraphs]
+        self.assertEqual(texts, ["Intro paragraph", "H3: 2. A Heading", "Body after heading"])
+
+    def test_sdt_wrapped_paragraph_in_cell_is_captured(self) -> None:
+        tbl = (
+            "<w:tbl><w:tr>"
+            f"<w:tc>{_p(_r('VI. Body content'))}</w:tc>"
+            f"<w:tc><w:sdt><w:sdtContent>{_p(_r('H2: Section'))}</w:sdtContent></w:sdt>"
+            f"{_p(_r('prose'))}</w:tc>"
+            "</w:tr></w:tbl>"
+        )
+        cell = self._read(tbl).tables[0].rows[0][1]
+        self.assertEqual([p.text for p in cell.paras], ["H2: Section", "prose"])
+
+    def test_inline_sdt_wrapped_run_appears_in_html(self) -> None:
+        # Word wraps a run in an INLINE <w:sdt> (content control on a span, not
+        # the whole paragraph). .html must descend into <w:sdtContent> or the
+        # run -- its bold, its text -- vanishes (real bug: body paragraphs came
+        # out empty because every run was sdt-wrapped). .text already recurses;
+        # .html must too, so they stay consistent.
+        run = _r("loud", bold=True)
+        body = _p(f'<w:sdt><w:sdtPr/><w:sdtContent>{run}</w:sdtContent></w:sdt>')
+        self.assertEqual(self._read(body).paragraphs[0].html, "<strong>loud</strong>")
+
+    def test_inline_sdt_run_keeps_order_with_direct_runs(self) -> None:
+        body = _p(
+            _r("A "),
+            f'<w:sdt><w:sdtContent>{_r("mid")}</w:sdtContent></w:sdt>',
+            _r(" C"),
+        )
+        para = self._read(body).paragraphs[0]
+        self.assertEqual(para.text, "A mid C")
+        self.assertEqual(para.html, "A mid C")
+
     def test_table_label_and_cell_paragraphs(self) -> None:
         # A house-template field table: label cell + body cell with 2 paras.
         tbl = (

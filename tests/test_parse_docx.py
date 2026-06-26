@@ -387,6 +387,23 @@ class ParseDocxParagraphStreamTest(unittest.TestCase):
         briefs = parse_docx.list_briefs(self.path)
         self.assertEqual([b.brand for b in briefs], ["BrandA (EN)", "BrandB (ZH)"])
 
+    def test_heading3_styled_body_heading_is_not_a_brand(self) -> None:
+        # A brand's body heading can itself carry the Heading3 paragraph style
+        # (Word/Google-Docs export quirk) yet its TEXT is a typed "H3: ..." body
+        # heading, not a brand name. Such paragraphs must not be mistaken for
+        # brand markers or list-briefs invents phantom brands + truncates the
+        # real brand's body at the first body heading (real bug: lost headings).
+        body = (
+            _h3("RealBrand")
+            + _p(_r("Intro."))
+            + _h3("H3: 2. A Body Heading")  # Heading3-styled BUT a typed heading
+            + _p(_r("Body under that heading."))
+        )
+        path = _docx(body)
+        self._paths.append(path)
+        briefs = parse_docx.list_briefs(path)
+        self.assertEqual([b.brand for b in briefs], ["RealBrand"])
+
     def test_no_brand_raises(self) -> None:
         with self.assertRaises(ParseError):
             parse_docx.parse(self.path)

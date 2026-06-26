@@ -88,6 +88,25 @@ def _safe_fromstring(data: bytes) -> ET.Element:
 # ---------- run-level helpers ----------------------------------------------
 
 
+def _block_runs(el: ET.Element):
+    """Yield ``<w:r>`` / ``<w:hyperlink>`` children of ``el`` in order, descending
+    into inline ``<w:sdt>`` content controls.
+
+    Word may wrap a paragraph's runs in an INLINE ``<w:sdt>`` (a content control
+    applied to a span, not the whole block); the real run then sits inside a
+    nested ``<w:sdtContent>``. A direct child scan misses it, so descend. This
+    keeps ``Para.html`` consistent with ``Para.text`` (which already recurses via
+    ``.iter()``) — without it, sdt-heavy briefs render body paragraphs empty.
+    """
+    for child in el:
+        if child.tag in (_w("r"), _w("hyperlink")):
+            yield child
+        elif child.tag == _w("sdt"):
+            content = child.find(_w("sdtContent"))
+            if content is not None:
+                yield from _block_runs(content)
+
+
 def _is_bold_run(run: ET.Element) -> bool:
     """A run is bold unless ``<w:b>`` is explicitly switched off."""
     rpr = run.find(_w("rPr"))
@@ -152,14 +171,27 @@ class Para:
     def html(self) -> str:
         """Inline HTML: runs -> text/``<strong>``, hyperlinks -> ``<a>``."""
         out: list[str] = []
-        for child in self._el:
+        for child in _block_runs(self._el):
             if child.tag == _w("r"):
                 out.append(_run_html(child))
-            elif child.tag == _w("hyperlink"):
-                inner = "".join(_run_html(r) for r in child.findall(_w("r")))
+            else:  # hyperlink
+                inner = "".join(
+                    _run_html(r) for r in _block_runs(child) if r.tag == _w("r")
+                )
                 rid = child.get(_r("id"))
                 href = self._rels.get(rid, "") if rid else ""
-                out.append(f'<a href="{href}">{inner}</a>' if href else inner)
+                core = inner.strip()
+                if href and core:
+                    # Google Docs sometimes exports the separating space as a run
+                    # INSIDE the hyperlink. Hoist leading/trailing whitespace OUT
+                    # of the <a> so the link doesn't glue to the adjacent word --
+                    # invisible in CJK, but "word<a>link</a>" in space-delimited
+                    # scripts (English et al.).
+                    lead = inner[: len(inner) - len(inner.lstrip())]
+                    trail = inner[len(inner.rstrip()):]
+                    out.append(f'{lead}<a href="{href}">{core}</a>{trail}')
+                else:
+                    out.append(inner)
         return "".join(out).strip()
 
     @property
@@ -250,16 +282,35 @@ class Document:
 # ---------- construction ----------------------------------------------------
 
 
+def _iter_block_children(parent: ET.Element):
+    """Yield the ``<w:p>`` / ``<w:tbl>`` block children of ``parent``,
+    transparently unwrapping ``<w:sdt>`` content controls.
+
+    Word wraps a block -- a heading, especially -- in an ``<w:sdt>`` structured
+    document tag when a content control is applied; the real paragraph/table
+    then lives inside a nested ``<w:sdtContent>``. A plain child walk that only
+    matches ``<w:p>`` / ``<w:tbl>`` silently drops every sdt-wrapped block, so
+    descend into ``<w:sdtContent>`` (recursively, for nested controls).
+    """
+    for child in parent:
+        if child.tag in (_w("p"), _w("tbl")):
+            yield child
+        elif child.tag == _w("sdt"):
+            content = child.find(_w("sdtContent"))
+            if content is not None:
+                yield from _iter_block_children(content)
+
+
 def _build_table(tbl_el: ET.Element, rels: dict[str, str]) -> Table:
     rows: list[list[Cell]] = []
     for tr in tbl_el.findall(_w("tr")):
         row: list[Cell] = []
         for tc in tr.findall(_w("tc")):
             blocks: list[Para | Table] = []
-            for child in tc:
+            for child in _iter_block_children(tc):
                 if child.tag == _w("p"):
                     blocks.append(Para(child, rels))
-                elif child.tag == _w("tbl"):
+                else:  # <w:tbl>
                     blocks.append(_build_table(child, rels))
             row.append(Cell(blocks))
         rows.append(row)
@@ -300,9 +351,9 @@ def read(path: str | Path) -> Document:
         raise DocxError(f"No <w:body> in {p}")
 
     blocks: list[Para | Table] = []
-    for child in body:
+    for child in _iter_block_children(body):
         if child.tag == _w("p"):
             blocks.append(Para(child, rels))
-        elif child.tag == _w("tbl"):
+        else:  # <w:tbl>
             blocks.append(_build_table(child, rels))
     return Document(blocks, rels)
