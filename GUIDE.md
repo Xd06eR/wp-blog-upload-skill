@@ -41,9 +41,9 @@ Each prompt pairs plain English with the exact command, so the agent acts reliab
 > `@blog-upload` upload `@‹your-brief.docx›` for `‹Client Name›`
 
 > - The skill always uploads as a **draft** and gives you back the draft link — you don't need to ask for either.
-> - **Got images?** Put them in a folder and mention it ("…the images are in this folder"). The agent uploads them and makes the first one the featured image.
+> - **Got images?** Put the image folder in `briefs/upload/` too and mention it ("…the images are in this folder"). The agent uploads them and makes the first one the featured image.
 > - If the file has sections for several clients, the agent shows the list and asks which one.
-> - If the client is new, the agent notices and walks you through adding it (it asks you for the WordPress site address, username, and an application password).
+> - If the client is **new**, the agent walks you through adding it — see **Setting up a new client** below. (You fill the site address, username, and an application password into a file — never the chat.)
 
 **③ Update the skill to the latest version**
 
@@ -68,7 +68,9 @@ After today you only repeat Steps 2–4.
 
 ### Step 1 — Get the skill + workspace (one time)
 
-**Just ask your agent:** paste prompt ① above. It clones the skill **and** sets up the workspace — a `blog-upload-workspace` folder where your briefs and saved client info live. You never open a terminal or manage that folder by hand.
+**Just ask your agent:** paste prompt ① above. It clones the skill **and** sets up the workspace — a `blog-upload-workspace` folder. The agent manages everything inside it (saved client logins, its memory) — the only place *you* put anything is:
+
+> 📁 **Where your files go:** `blog-upload-workspace/briefs/upload/`. Drop your brief `.docx` (and any image folder) here — it's the only place the agent looks for them.
 
 ### Step 2 — Get your brief as a Word file (.docx)
 
@@ -79,13 +81,13 @@ Word (`.docx`) is the **recommended, safe default** — download the Google Doc 
 **Download the whole brief as Word (do this):**
 1. Open the brief in **Google Docs**.
 2. **File → Download → Microsoft Word (.docx)**.
-3. It lands in your Downloads folder (e.g. `my-blog-brief.docx`). Hand that file to the agent.
+3. It lands in your Downloads folder (e.g. `my-blog-brief.docx`). **Move it into `blog-upload-workspace/briefs/upload/`** — that's where the agent looks for briefs.
 
 **Alternative — Markdown (`.md`), for simple posts only:** the skill still accepts Markdown, and it's fine when the brief has no table around the body. To get it: **File → Download → Markdown (.md)**, *or* turn Markdown on (**Tools → Preferences → tick "Enable Markdown" → OK**) and use **Edit → Copy as Markdown**, then paste into a plain-text editor and save with a `.md` ending. When in doubt, use Word — it's the safer choice.
 
 ### Step 3 — Upload it
 
-**Easiest — ask your agent** (paste prompt ②, or use your agent's file shortcut). Give the **client name** + the **file**. The agent then:
+**Ask your agent** (paste prompt ②). Give the **client name** + the **brief file name** (the one you dropped in `briefs/upload/`). The agent then:
 - finds the client (or sets it up if it's new — asking you for the login),
 - asks which section if the file has several,
 - creates the draft and gives you the **edit link**.
@@ -103,6 +105,32 @@ Open the **edit link** the agent gives you, then in WP admin:
 
 ---
 
+## 🔑 Setting up a new client (the first time)
+
+The first time you upload for a client, the agent needs that WordPress site's login. It sets this up **with** you — you never type the password into the chat.
+
+What happens:
+1. The agent makes a small **login file** for you to fill in (it tells you the file's name and where it is).
+2. Open that file in any plain-text editor (Notepad on Windows, TextEdit on Mac, or VS Code).
+3. Fill in three things:
+   - **WordPress site address** — e.g. `https://clientsite.com`
+   - **Your WordPress username**
+   - **An application password** — see below (this is *not* your normal login password)
+4. Save the file and tell the agent **"done."**
+5. The agent checks the login, stores it securely, and deletes the temporary file. **It remembers this client from now on — you only do this once per site.**
+
+**Where to get an application password** (a special password WordPress makes just for apps):
+1. In WordPress admin, go to **Users → Profile** (or **Users → Your Profile**).
+2. Scroll down to **Application Passwords**.
+3. Type a name (e.g. `blog-upload`) and click **Add New Application Password**.
+4. Copy the password it shows — that's what goes in the login file.
+
+> ⚠️ **An application password is not your login password.** It's a separate one WordPress generates for tools like this. Your WordPress user also needs an **Editor** or **Administrator** role to create posts.
+
+> 🔒 **Never paste the password into the chat.** It only ever goes in the login file the agent makes for you.
+
+---
+
 ## Keeping the skill updated
 
 **Just ask your agent:** paste prompt ③ above. The agent updates the skill and tells you what changed — nothing for you to run.
@@ -111,7 +139,7 @@ Open the **edit link** the agent gives you, then in WP admin:
 
 ## What NOT to do
 
-- ❌ Don't paste WordPress passwords into the chat — the agent will tell you to put them in a file instead.
+- ❌ Don't paste WordPress passwords into the chat — fill them into the **login file** the agent makes for you (see *Setting up a new client*).
 - ❌ Don't hand-edit the `data/` folder or delete `clients.db` — that's the agent's memory of your clients.
 - ❌ Don't expect it to publish — it makes **drafts** only, on purpose. Nothing goes live until you click Publish yourself.
 

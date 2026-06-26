@@ -345,9 +345,9 @@
     <blockquote><span class="at-tag">@blog-upload</span> upload <code>@‹your-brief.docx›</code> for <code>‹Client Name›</code></blockquote>
     <ul>
       <li>The skill always uploads as a <strong>draft</strong> and gives you back the draft link — you don't need to ask for either.</li>
-      <li><strong>Got images?</strong> Put them in a folder and mention it ("…the images are in this folder"). The agent uploads them and makes the first one the featured image.</li>
+      <li><strong>Got images?</strong> Put the image folder in <code>briefs/upload/</code> too and mention it ("…the images are in this folder"). The agent uploads them and makes the first one the featured image.</li>
       <li>If the file has sections for several clients, the agent shows the list and asks which one.</li>
-      <li>If the client is new, the agent notices and walks you through adding it (it asks you for the WordPress site address, username, and an application password).</li>
+      <li>If the client is <strong>new</strong>, the agent walks you through adding it — see <strong>Setting up a new client</strong> below. (You fill the site address, username, and an application password into a file — never the chat.)</li>
     </ul>
 
     <p><strong>③ Update the skill to the latest version</strong></p>
@@ -373,7 +373,8 @@
     <h2>Step by step</h2>
 
     <h3><span class="step-badge">1</span>Get the skill + workspace (one time)</h3>
-    <p><strong>Just ask your agent:</strong> paste prompt ① above. It clones the skill <strong>and</strong> sets up the workspace — a <code>blog-upload-workspace</code> folder where your briefs and saved client info live. You never open a terminal or manage that folder by hand.</p>
+    <p><strong>Just ask your agent:</strong> paste prompt ① above. It clones the skill <strong>and</strong> sets up the workspace — a <code>blog-upload-workspace</code> folder. The agent manages everything inside it (saved client logins, its memory) — the only place <em>you</em> put anything is:</p>
+    <div class="callout callout-tip">📁 <strong>Where your files go:</strong> <code>blog-upload-workspace/briefs/upload/</code>. Drop your brief <code>.docx</code> (and any image folder) here — it's the only place the agent looks for them.</div>
 
     <h3><span class="step-badge">2</span>Get your brief as a Word file (.docx)</h3>
     <p>Word (<code>.docx</code>) is the <strong>recommended, safe default</strong> — download the Google Doc as Word and hand that to the agent.</p>
@@ -384,11 +385,11 @@
       <li>Menu:
         <div><span class="menu-path">File <span class="arrow">▸</span> Download <span class="arrow">▸</span> Microsoft Word (.docx)</span></div>
       </li>
-      <li>It lands in your Downloads folder (e.g. <code>my-blog-brief.docx</code>). Hand that file to the agent.</li>
+      <li>It lands in your Downloads folder (e.g. <code>my-blog-brief.docx</code>). <strong>Move it into <code>blog-upload-workspace/briefs/upload/</code></strong> — that's where the agent looks for briefs.</li>
     </ol>
     <p><strong>Alternative — Markdown (<code>.md</code>), for simple posts only:</strong> the skill still accepts Markdown, and it's fine when the brief has no table around the body. To get it, use <span class="menu-path">File <span class="arrow">▸</span> Download <span class="arrow">▸</span> Markdown (.md)</span> — <em>or</em> turn Markdown on (<span class="menu-path">Tools <span class="arrow">▸</span> Preferences <span class="arrow">▸</span> ✓ Enable Markdown</span>) and use <strong>Edit → Copy as Markdown</strong>, then paste into a plain-text editor and save with a <code>.md</code> ending. When in doubt, use Word — it's the safer choice.</p>
     <h3><span class="step-badge">3</span>Upload it</h3>
-    <p><strong>Easiest — ask your agent</strong> (paste prompt ②, or use your agent's file shortcut). Give the <strong>client name</strong> + the <strong>file</strong>. The agent then:</p>
+    <p><strong>Ask your agent</strong> (paste prompt ②). Give the <strong>client name</strong> + the <strong>brief file name</strong> (the one you dropped in <code>briefs/upload/</code>). The agent then:</p>
     <ul>
       <li>finds the client (or sets it up if it's new — asking you for the login),</li>
       <li>asks which section if the file has several,</li>
@@ -407,6 +408,34 @@
   </div>
 
   <div class="surface">
+    <h2>🔑 Setting up a new client (the first time)</h2>
+    <p>The first time you upload for a client, the agent needs that WordPress site's login. It sets this up <strong>with</strong> you — you never type the password into the chat.</p>
+    <p><strong>What happens:</strong></p>
+    <ol>
+      <li>The agent makes a small <strong>login file</strong> for you to fill in (it tells you the file's name and where it is).</li>
+      <li>Open that file in any plain-text editor (Notepad on Windows, TextEdit on Mac, or VS Code).</li>
+      <li>Fill in three things:
+        <ul>
+          <li><strong>WordPress site address</strong> — e.g. <code>https://clientsite.com</code></li>
+          <li><strong>Your WordPress username</strong></li>
+          <li><strong>An application password</strong> — see below (this is <em>not</em> your normal login password)</li>
+        </ul>
+      </li>
+      <li>Save the file and tell the agent <strong>"done."</strong></li>
+      <li>The agent checks the login, stores it securely, and deletes the temporary file. <strong>It remembers this client from now on — you only do this once per site.</strong></li>
+    </ol>
+    <p><strong>Where to get an application password</strong> (a special password WordPress makes just for apps):</p>
+    <ol>
+      <li>In WordPress admin, go to <span class="menu-path">Users <span class="arrow">▸</span> Profile</span> (or <strong>Users → Your Profile</strong>).</li>
+      <li>Scroll down to <strong>Application Passwords</strong>.</li>
+      <li>Type a name (e.g. <code>blog-upload</code>) and click <strong>Add New Application Password</strong>.</li>
+      <li>Copy the password it shows — that's what goes in the login file.</li>
+    </ol>
+    <div class="callout callout-warn">⚠️ <strong>An application password is not your login password.</strong> It's a separate one WordPress generates for tools like this. Your WordPress user also needs an <strong>Editor</strong> or <strong>Administrator</strong> role to create posts.</div>
+    <div class="callout callout-danger">🔒 <strong>Never paste the password into the chat.</strong> It only ever goes in the login file the agent makes for you.</div>
+  </div>
+
+  <div class="surface">
     <h2>Keeping the skill updated</h2>
     <p><strong>Just ask your agent:</strong> paste prompt ③ above. The agent updates the skill and tells you what changed — nothing for you to run.</p>
   </div>
@@ -414,7 +443,7 @@
   <div class="surface">
     <h2>What NOT to do</h2>
     <ul class="dont-list">
-      <li>❌ Don't paste WordPress passwords into the chat — the agent will tell you to put them in a file instead.</li>
+      <li>❌ Don't paste WordPress passwords into the chat — fill them into the <strong>login file</strong> the agent makes for you (see <em>Setting up a new client</em>).</li>
       <li>❌ Don't hand-edit the <code>data/</code> folder or delete <code>clients.db</code> — that's the agent's memory of your clients.</li>
       <li>❌ Don't expect it to publish — it makes <strong>drafts</strong> only, on purpose. Nothing goes live until you click Publish yourself.</li>
     </ul>
