@@ -207,6 +207,28 @@ class PreparedImageTest(unittest.TestCase):
             })
 
 
+class PreparedTableTest(unittest.TestCase):
+    """upload-prepared body[] accepts table blocks. The docx agentic-fallback
+    (Route B) carries in-body Word tables through as ParsedDoc 'table' blocks,
+    so the JSON path must read 'rows' (not silently drop them)."""
+
+    def test_payload_accepts_table_block(self) -> None:
+        doc = upload_blog._payload_to_parsed_doc({
+            "title": "T",
+            "body": [{"kind": "table", "rows": [["Head A", "Head B"], ["a1", "b1"]]}],
+        })
+        block = doc.body[0]
+        self.assertEqual(block.kind, "table")
+        self.assertEqual(block.rows, [["Head A", "Head B"], ["a1", "b1"]])
+
+    def test_table_block_requires_rows(self) -> None:
+        with self.assertRaises(ValueError):
+            upload_blog._payload_to_parsed_doc({
+                "title": "T",
+                "body": [{"kind": "table", "text": "missing rows"}],
+            })
+
+
 class MediaDirTest(unittest.TestCase):
     """--media-dir synthesizes image blocks from a folder, name-sorted."""
 

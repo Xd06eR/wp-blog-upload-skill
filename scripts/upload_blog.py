@@ -142,6 +142,13 @@ def _payload_to_parsed_doc(payload: dict) -> ParsedDoc:
             if not src:
                 raise ValueError(f"payload.body[{i}] image block requires 'src' (local file path)")
             blocks.append(Block(kind="image", src=src, alt=str(block_in.get("alt", "")).strip()))
+        elif kind == "table":
+            rows_in = block_in.get("rows")
+            if not isinstance(rows_in, list) or not all(isinstance(r, list) for r in rows_in):
+                raise ValueError(
+                    f"payload.body[{i}] table block requires 'rows' (an array of row arrays)"
+                )
+            blocks.append(Block(kind="table", rows=[[str(c) for c in row] for row in rows_in]))
         else:
             blocks.append(Block(kind=kind, text=str(block_in.get("text", "")).strip()))
 
