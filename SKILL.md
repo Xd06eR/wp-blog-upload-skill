@@ -19,6 +19,26 @@ If the operator asks how to use this skill, asks for help, or wants to be taught
 Read [`HELP.md`](HELP.md) and follow it: output the quick help card, then offer the hands-on walk-through.
 Resume the normal workflow below only when they actually want to upload (or once a hands-on lesson reaches a real upload).
 
+## Update mode (check first)
+
+If the operator asks to update the skill, get the latest version, or check for a newer release — e.g. "`@blog-upload update`", "update this skill", "how do I update", "is there a new version" — do **not** start an upload.
+This skill is a git checkout; you update it by pulling on the operator's behalf — they never run git themselves.
+
+1. **Confirm it's a git checkout.** `git -C <skill-dir> rev-parse --is-inside-work-tree`. If that errors, the skill was copied (not `git clone`d) and can't self-update — tell the operator to re-clone from `https://github.com/Xd06eR/wp-blog-upload-skill.git`, then stop.
+2. **Fast-forward only**, recording the version first so you can report what changed:
+
+   ```bash
+   BEFORE=$(git -C <skill-dir> rev-parse HEAD)
+   git -C <skill-dir> pull --ff-only
+   git -C <skill-dir> log --oneline "$BEFORE"..HEAD
+   ```
+
+   `--ff-only` because the skill folder is immutable by design, so it advances cleanly. If the pull refuses (local edits or diverged history — the folder isn't meant to be edited), do **not** merge, rebase, reset, or force — report what blocked it and stop.
+3. **Report in plain language.** Empty `log` → "already up to date." Otherwise summarize the new commits' subjects (they read `feat:` / `fix:` / `docs:`) as a short what-changed list. Never show raw git output or commit hashes.
+
+Never touch `blog-upload-workspace/` during an update — it's the operator's data (clients, logins, memory), not part of the skill repo.
+Resume the normal workflow below only when they actually want to upload.
+
 ## Where things live
 
 | Folder | What it holds | Mutable? |
@@ -259,6 +279,7 @@ To fix an index line *without* adding a dated entry, call `set_meta(slug, summar
 - **NEVER** read `data/secrets/_pending.json` or `data/secrets/<slug>.json` yourself — only the CLI handles them.
 - **NEVER** install pip packages — the skill is pure stdlib.
 - **NEVER** write scratch Python scripts inside the workspace.
+- **NEVER** merge, rebase, reset, or force when updating the skill — `git pull --ff-only` only; if it can't fast-forward, stop and report.
 - **DO NOT** describe the body content back to the operator before uploading. They check it in WP admin.
 
 ## Reference

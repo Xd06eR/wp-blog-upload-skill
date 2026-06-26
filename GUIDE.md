@@ -50,7 +50,7 @@ Each prompt pairs plain English with the exact command, so the agent acts reliab
 
 **③ Update the skill to the latest version**
 
-> Update my blog-upload skill to the latest version: run `git pull` inside the `blog-upload` folder, then tell me what changed.
+> Say *"@blog-upload update"* — or *"update my blog-upload skill, and tell me what changed."*
 
 > 💡 **If anything ever looks off, just tell the agent in plain English what happened** ("the upload failed — what went wrong?"). It explains, fixes it, or asks you for what it needs. You never have to memorize commands or troubleshoot yourself.
 
@@ -136,7 +136,7 @@ What happens:
 
 ## Keeping the skill updated
 
-**Just ask your agent:** paste prompt ③ above. The agent updates the skill and tells you what changed — nothing for you to run.
+**Just ask your agent** (prompt ③): say *"@blog-upload update."* The agent pulls the latest version and tells you what changed — nothing for you to run. (If the skill was set up by copying instead of cloning, it'll say so and point you to re-clone.)
 
 ---
 

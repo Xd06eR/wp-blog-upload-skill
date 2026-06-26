@@ -29,6 +29,8 @@ Render it like this (adapt lightly to the conversation):
 >
 > **New client?** I'll set up its WordPress login *with* you — I make a small file, you fill in the site address, username, and an **application password** (never typed into the chat).
 >
+> **Want the latest version?** Just say **"update this skill"** — I'll fetch it and tell you what changed.
+>
 > **Anything looks off?** Just tell me in plain English — no commands to memorize.
 
 Then ask: *"Want me to walk you through it hands-on, step by step?"*
