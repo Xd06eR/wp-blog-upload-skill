@@ -9,6 +9,7 @@ Doc map:
 | `CLAUDE.md` (this file) | Maintainer / agent | Design rationale, conventions, how to extend |
 | `SKILL.md` | Agent | Operational workflow the agent follows at runtime |
 | `REFERENCE.md` | Agent | Full SOP, CLI reference, failure recovery |
+| `HELP.md` | Agent | In-chat help card + hands-on teaching script (when the user asks for help) |
 | `README.md` | Developer | Project overview + install |
 | `GUIDE.md` / `GUIDE.html` | Non-technical users | Step-by-step usage |
 
@@ -57,10 +58,8 @@ Data flow:
 brief (.docx | .md) → intake.parser_for() → parse_docx | parse_md → render (adapter) → WP REST /posts (draft)
 ```
 
-`.docx` parses natively for recognized layouts. A brief that drifts — a `.md`
-off-schema, or a `.docx` whose layout isn't recognized — falls back to agent
-mapping (markdown: `inspect-brief` → normalize or `ParsedDoc` JSON; docx:
-`docx_reader` dump → `ParsedDoc` JSON) — see "Brief format + fallback".
+`.docx` parses natively for recognized layouts.
+A brief that drifts — a `.md` off-schema, or a `.docx` whose layout isn't recognized — falls back to agent mapping (markdown: `inspect-brief` → normalize or `ParsedDoc` JSON; docx: `docx_reader` dump → `ParsedDoc` JSON) — see "Brief format + fallback".
 
 ## Key components
 

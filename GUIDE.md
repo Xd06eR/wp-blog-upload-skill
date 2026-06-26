@@ -12,6 +12,9 @@ What the tool does for you:
 
 > Works on Mac, Windows, and Linux. **Launch your agent from your work folder** — the first time, it creates the workspace there; after that it finds it automatically (even from sub-folders).
 
+> 🎓 **New here? Ask the agent to teach you.**
+> Say *"@blog-upload help"* or *"teach me this skill"* — it gives a quick rundown and can walk you through your first upload step by step.
+
 ---
 
 ## How you talk to your agent

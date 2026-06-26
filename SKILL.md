@@ -1,6 +1,6 @@
 ---
 name: blog-upload
-description: Upload a new WordPress blog draft from a brief the operator drops into the workspace. Accepts both Word `.docx` and markdown `.md` (auto-detected) — `.docx` is the safer default, since some briefs wrap the article body in a table cell that markdown export can flatten. AI parses the brief (single, multi-client, or translation format), picks the right client by name, and POSTs straight to WordPress as a draft. Auto-creates the workspace folder on first use. Pure stdlib, no pip install. Yoast / RankMath meta is filled by hand afterwards. Optionally uploads the brief's images from a folder and sets the first as the featured image. Use when the user wants to upload a new SEO blog post to a client WordPress site from a `.docx` or `.md` brief.
+description: Upload a finished blog brief (`.docx` or `.md`, auto-detected) as a WordPress draft for the right client: parses the brief, picks the client by name, optionally uploads images, never publishes. Handles single, multi-client, and translation briefs. Use when the user wants to put an SEO blog post on a client WordPress site from a brief — or when they ask how to use this skill, want help, or want to be taught (e.g. `blog-upload help`, "teach me this skill").
 ---
 
 # Blog Upload (WordPress)
@@ -12,6 +12,12 @@ No preview. No approval gate. Straight from the brief (`.docx` or `.md`) to Word
 **Brief format — `.docx` is the safer default.** The skill auto-detects by file extension. Writers format briefs differently, and some wrap the whole article body inside a Word table cell. When they do, markdown export *can* flatten that cell into one line and lose the heading/paragraph boundaries, so the `.md` may parse as boilerplate. The `.docx` keeps the structure intact either way — headings, paragraphs, in-body tables, native bullet lists, real hyperlinks. Prefer `.docx` when both exist; `.md` is fine for briefs whose body isn't table-wrapped (e.g. a multi-client `### **Brand**` file).
 
 The `python3 -m scripts.run ...` commands below are **your** tools, not the operator's. You run them silently on their behalf. Never tell the operator to type a command, paste a CLI line, or open a terminal — they only ever talk to you in plain English. Surface results (draft URL, questions), never the mechanics.
+
+## Help mode (check first)
+
+If the operator asks how to use this skill, asks for help, or wants to be taught — e.g. "`@blog-upload help`", "how do I use this", "what can you do", "teach me", "I'm new" — do **not** start an upload.
+Read [`HELP.md`](HELP.md) and follow it: output the quick help card, then offer the hands-on walk-through.
+Resume the normal workflow below only when they actually want to upload (or once a hands-on lesson reaches a real upload).
 
 ## Where things live
 
