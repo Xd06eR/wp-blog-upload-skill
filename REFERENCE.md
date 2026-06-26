@@ -134,41 +134,42 @@ All commands run with `PYTHONPATH=<skill-dir> python3 -B -m scripts.run`, where 
 | `playbook-index` | Always-load cross-client memory: one record per playbook — curated `summary` + brand `aliases` (hybrid: falls back to newest headline). Run at Phase 1 **before** client pick to resolve brand→slug | JSON: `[{slug, summary, aliases, source}, ...]` |
 | `onboard --from-file <path> [--slug <slug>]` | Verify creds against WP, write `<slug>.json`, insert client row, delete pending file. `--slug` overrides the slug auto-derived from the site URL (use it to resolve a slug collision) | Human readable |
 | `list-briefs --doc <path>` | Pre-scan a `.docx` or `.md` brief for client / body sections (strict parser; auto-detected by extension) | JSON: `[{brand, page_url, h1, word_count}, ...]` |
-| `inspect-brief --doc <path.md>` | Dump every table + heading + counts in a **markdown** brief (debug aid when strict parser returns `[]`). Markdown-only — refuses `.docx` (a `.docx` parses natively, so there is nothing to inspect) | JSON: `{section_headers, tables, headings, paragraph_count, list_count}` |
+| `inspect-brief --doc <path.md>` | Dump every table + heading + counts in a **markdown** brief (debug aid when strict parser returns `[]`). Markdown-only — refuses `.docx`; dump an unrecognized `.docx` with `docx_reader` instead (see "Handling alien briefs") | JSON: `{section_headers, tables, headings, paragraph_count, list_count}` |
 | `upload --client <slug> --doc <path> [--brand <name>] [--media-dir <dir>]` | Parse + render + POST as draft (`.docx` / `.md` auto-detected). `--media-dir` uploads every image in the folder (name-sorted), appends them to the body, and sets the first as the featured image | JSON: `{title, post_id, post_url, edit_url, brand, warnings, media}` |
 | `upload-prepared --client <slug> --from-file <payload.json>` | Render + POST from agent-emitted ParsedDoc JSON (bypasses the brief parser) | Same as `upload` |
 
-`.docx` briefs are parsed natively — there is no normalize step, and `inspect-brief` does not apply to them. `warnings` is an array of non-fatal advisories (e.g. a defaulted editor); empty when the run was clean. An empty body or missing H1 is a hard error (the run aborts), not a warning.
+`.docx` briefs parse natively for every layout the reader recognizes — no normalize step, and `inspect-brief` doesn't apply (it's a markdown aid). A `.docx` whose layout *isn't* recognized makes `list-briefs` return `[]` (same signal as an alien `.md`); map it with Route B, dumping structure via `docx_reader` (see "Handling alien briefs"). `warnings` is an array of non-fatal advisories (e.g. a defaulted editor); empty when the run was clean. An empty body or missing H1 in a *recognized* layout is a hard error (the run aborts), not a warning.
 
 Non-zero exit codes: `1` runtime failure, `2` bad argument.
 
-## Handling alien markdown briefs
+## Handling alien briefs (markdown or docx)
 
-**First, check for a `.docx`.** The Roman-numeral / body-in-a-cell house template parses natively from `.docx` (see "House template" above), so if a `.docx` exists, use it — the routes below are not needed. The normalization fallback here is **markdown-only**: it applies to a `.md` that drifts from the schema *and* has no `.docx` twin.
+`list-briefs` returning `[]` is the trigger for agent-driven interpretation — the deterministic parser found no section and cannot recover on its own (and must not be patched ad-hoc for every new writer variation). While `list-briefs` still returns sections, use the normal `upload` path. Two shapes reach the empty result:
 
-A markdown brief that doesn't match the schema above (missing brand header, drifting writer conventions, a body-in-a-table export the flattening hit) makes `list-briefs` return `[]`. Writer formats vary, so expect this; that empty result is the trigger for agent-driven interpretation — the deterministic markdown parser cannot recover on its own and must not be patched ad-hoc for every new writer variation.
+- **A `.md` that drifts from the schema** (missing brand header, drifting writer conventions, a body-in-a-table export the flattening hit). **First, check for a `.docx` twin** — the Roman-numeral / body-in-a-cell house template parses natively from `.docx` (see "House template"), so if one exists, use it and skip the routes below. Only a `.md` with no `.docx` twin needs interpreting.
+- **A `.docx` whose layout `parse_docx` doesn't recognize** — no `VI. Body content` table and no `Heading3` brand markers, so `list-briefs` returns `[]` and `parse` raises `No recognizable brief sections`. There's no better-parsing twin to defer to; map it via **Route B**, dumping its structure with `docx_reader` (a one-off `python3 -B -c`) since `inspect-brief` is markdown-only. (A `.docx` that parses to *sections* but then fails is **not** this case: a multi-body file without `--brand` still *lists* its sections — pick one and pass `--brand`; an empty body cell is the upload-time hard error. Neither returns `[]`, so neither is the fallback trigger — see Failure recovery.)
 
 ### Decision tree
 
 Both routes work in a temp file outside the workspace (mktemp-style) and delete it after upload — never leave a normalized `.md` or a prepared-JSON artifact in the workspace.
 
 ```text
-.docx twin exists? ──▶ use it (parses natively), skip this tree
-   │
-   ▼ (markdown only, no .docx)
-list-briefs --doc X.md
+list-briefs --doc X                # .md or .docx, auto-detected
    │
    ├── non-empty array? ──▶ Standard upload (Phase 3 in SKILL.md)
    │
    └── empty [] ?
-            │
-            ▼
-       inspect-brief --doc X.md          # map tables + headings
-            │
-            ▼
-       Decide route:
-         A) Close to schema?     ──▶ normalize to a TEMP .md, upload, delete it
-         B) Structurally alien?  ──▶ emit ParsedDoc JSON to a TEMP file, upload-prepared, delete it
+        │
+        ├── X is .md, a .docx twin exists? ──▶ use the .docx (parses natively), skip this tree
+        │
+        ├── X is .md, no twin:
+        │     inspect-brief --doc X.md             # map tables + headings
+        │     A) Close to schema?    ──▶ normalize to a TEMP .md,    upload,          delete it
+        │     B) Structurally alien? ──▶ ParsedDoc JSON to a TEMP file, upload-prepared, delete it
+        │
+        └── X is .docx (unrecognized layout):
+              docx_reader dump via python3 -B -c    # inspect-brief refuses .docx
+              B) ParsedDoc JSON to a TEMP file, upload-prepared, delete it   # keeps tables/links/bold
 ```
 
 ### Verbatim rule (non-negotiable)
@@ -328,7 +329,7 @@ Entries are dated `## YYYY-MM-DD — headline`. The live file holds the most rec
 | `ERROR: Brand '<x>' not found in <path>. Available: [...]` | Misspelled brand name | Run `list-briefs` to show real names, retry |
 | `WordPress rejected the username + application password` (onboarding) / `WordPress refused to <action> (HTTP 401)` (upload) | App password wrong / user lacks role | Re-onboard the client (delete `<slug>.json`, copy `.env.example` again) |
 | Onboarding errors on a slug collision (a different client already derives this slug) | Two clients map to the same auto-derived slug | Re-run `onboard` with an explicit `--slug <slug>` |
-| Upload fails loud on an empty body / missing H1 | Brief parsed to no body content (e.g. an `.md` export of a body-in-a-table brief where the export may have flattened the body cell) | Use the `.docx` instead; if markdown-only, normalize it (Route A) or emit ParsedDoc JSON (Route B) so the body is populated |
+| Upload fails loud on an empty body / missing H1 | Brief parsed to no body content (e.g. an `.md` export of a body-in-a-table brief where the export may have flattened the body cell) | Use the `.docx` instead **when the `.md` flattened a body the `.docx` still holds** (the common case); if the `.docx` body cell is genuinely empty that's an authoring gap, not a parse miss. Markdown-only with no twin: normalize (Route A) or emit ParsedDoc JSON (Route B) so the body is populated |
 | `warnings` includes `Image upload failed for <file>` | Image file missing/unreadable, or WP rejected it (size / MIME / media permissions) | Confirm the file exists and the WP user can upload media, then re-run; the draft still posts without that image |
 | `ERROR: --media-dir is not a directory: <path>` | `--media-dir` pointed at a missing folder or a file | Pass the folder that holds the image files |
 | `ERROR: ... No adapter for editor '<x>'` | New editor type detected | Check `clients.editor` value — skill ships gutenberg / classic / elementor only |

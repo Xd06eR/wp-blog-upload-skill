@@ -57,9 +57,10 @@ Data flow:
 brief (.docx | .md) → intake.parser_for() → parse_docx | parse_md → render (adapter) → WP REST /posts (draft)
 ```
 
-`.docx` parses natively. A `.md` that drifts from the schema falls back to agent
-mapping (`inspect-brief` → normalize, or emit `ParsedDoc` JSON) — see "Brief
-format + fallback".
+`.docx` parses natively for recognized layouts. A brief that drifts — a `.md`
+off-schema, or a `.docx` whose layout isn't recognized — falls back to agent
+mapping (markdown: `inspect-brief` → normalize or `ParsedDoc` JSON; docx:
+`docx_reader` dump → `ParsedDoc` JSON) — see "Brief format + fallback".
 
 ## Key components
 
@@ -86,7 +87,7 @@ PYTHONPATH=<skill-dir> python3 -B -m scripts.run <subcommand> ...
 
 `.docx` is the safer default: some writers wrap the article body in a table cell, which markdown export can flatten (structure lost). `parse_docx` reads such briefs natively, so a `.docx` rarely needs any fallback. The `.md` canonical schema: an `### **Brand**` section header, a pipe table with URL / H1 / Meta Title / Meta Description / Keywords / Word count, then body with `**H1:/H2:/H3:**` headings. Full schema in `REFERENCE.md`. Writer formats vary — the parser covers common shapes and the agent adapts to the rest.
 
-The fallback is **markdown-only**: when `list-briefs` returns `[]` for a `.md` with no `.docx` twin, the agent maps it with `inspect-brief` and either **normalizes it** (Route A, default — mechanical fixes only) or **emits a `ParsedDoc` JSON** for `upload-prepared` (Route B). Both write to a **temp file outside the workspace and delete it after** — never leave a `*-normalized.md` / `_prepared_*.json` artifact in `briefs/upload/` or `data/` (it confuses the non-technical operator). `inspect-brief` is markdown-only (refuses `.docx`, which parses natively).
+The fallback fires when `list-briefs` returns `[]` (the deterministic parser found no section). For a `.md` with no `.docx` twin, the agent maps it with `inspect-brief` and either **normalizes it** (Route A, default — mechanical fixes only) or **emits a `ParsedDoc` JSON** for `upload-prepared` (Route B). A `.docx` whose layout `parse_docx` doesn't recognize returns `[]` too; since `inspect-brief` refuses `.docx`, the agent dumps its structure with `docx_reader` (a one-off `-c`) and takes **Route B**, emitting the `ParsedDoc` JSON from the reader's already-extracted HTML (in-body tables, links, and bold preserved). Both routes write to a **temp file outside the workspace and delete it after** — never leave a `*-normalized.md` / `_prepared_*.json` artifact in `briefs/upload/` or `data/` (it confuses the non-technical operator).
 
 **Verbatim rule (non-negotiable):** body prose is copied word-for-word. The agent's job is structural mapping, never content rewriting. Only normalize heading levels, list markers, escape characters, and pipe-cell artifacts.
 

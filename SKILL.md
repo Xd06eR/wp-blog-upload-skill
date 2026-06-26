@@ -112,21 +112,41 @@ Output is a JSON array, one entry per section. There are three section shapes th
 
   > *"This file has N sections: [list]. Which one?"*
 
-- **Empty array `[]`**: only happens for a `.md` that drifts from every schema (a `.docx` that fails parses with a clear error instead, or returns its sections). For a `.md`, drop into **Phase 2b** below. **First, check whether a `.docx` of the same brief exists** — if so, just use that; it almost certainly parses natively and saves all the Phase-2b work.
+- **Empty array `[]`**: the strict parser found no section. Usual cause is a `.md` that drifts from every schema — but a `.docx` whose layout `parse_docx` doesn't recognize (no Roman-numeral `VI. Body content` table, no `Heading3` brand markers) returns `[]` too. Either way, drop into **Phase 2b**. **For a `.md`, first check whether a `.docx` twin exists** — if so, use that; it usually parses natively and skips the fallback. A `.docx` that *itself* returns `[]` has no better-parsing twin to defer to — go straight to Phase 2b's docx branch.
 
-## Phase 2b — Markdown fallback (only for a `.md` that returns `[]`)
+## Phase 2b — Agentic fallback (a brief that returns `[]`)
 
-> **`.docx` briefs never need this.** The Word reader handles the house template (table-wrapped body, Roman-numeral field tables, full-width colons, in-body tables, native bullet lists) natively. Phase 2b exists only for a `.md` file that drifts from every schema **and** has no `.docx` twin. If a `.docx` exists, use it and skip this phase.
+`list-briefs` returning `[]` means the deterministic parser found no section — the trigger for *you* to interpret the brief and emit it yourself. Don't reach for this while `list-briefs` still returns sections; that's the normal `upload` path. Two shapes land here, handled slightly differently:
 
-The canonical `.md` schema (see [`REFERENCE.md`](REFERENCE.md)): an H3 brand header (bold optional), a pipe table with URL/H1/Meta Title/Meta Description/Keywords/Word count, body with `**H1:/H2:/H3:**` headings. When a `.md` drifts from that and there's no `.docx`, *you* interpret it.
+> **A `.docx` rarely lands here.** The Word reader handles the house template (table-wrapped body, Roman-numeral field tables, full-width colons, in-body tables, native bullet lists) natively, so a normal `.docx` returns sections, not `[]`. A `.docx` that *does* return `[]` is a genuinely unrecognized layout (no `VI. Body content` table, no `Heading3` brands) — there is no better-parsing twin to defer to, so map it via the **docx branch** below: dump it with `docx_reader` (since `inspect-brief` refuses `.docx`) and take **Route B**.
+
+> **A `.md` lands here often.** The canonical `.md` schema (see [`REFERENCE.md`](REFERENCE.md)): an H3 brand header (bold optional), a pipe table with URL/H1/Meta Title/Meta Description/Keywords/Word count, body with `**H1:/H2:/H3:**` headings. When a `.md` drifts from that, **first check for a `.docx` twin** (it usually parses natively and saves this work); only if there's none do *you* interpret the `.md`.
 
 ### Step 1 — Map the brief
+
+**A `.md`** — `inspect-brief` dumps its structure:
 
 ```bash
 PYTHONPATH=<skill-dir> python3 -B -m scripts.run inspect-brief --doc $WS/briefs/upload/FILENAME.md
 ```
 
-Returns `{section_headers, tables, headings, paragraph_count, list_count}`. Use it to locate the URL / H1 / Meta / Keywords table and the body headings. Read the source `.md` directly for prose — never paraphrase. (`inspect-brief` is markdown-only; it refuses `.docx` because those parse natively.)
+Returns `{section_headers, tables, headings, paragraph_count, list_count}`. Use it to locate the URL / H1 / Meta / Keywords table and the body headings. Read the source `.md` directly for prose — never paraphrase.
+
+**A `.docx`** — `inspect-brief` refuses `.docx` (it's a markdown aid), so dump the block structure with the native reader, a one-off `-c` (nothing written to disk):
+
+```bash
+PYTHONPATH=<skill-dir> python3 -B -c "
+from scripts.tools import docx_reader
+doc = docx_reader.read('$WS/briefs/upload/FILENAME.docx')
+for b in doc.blocks:
+    if isinstance(b, docx_reader.Para):
+        print(repr(b.style), '| list:', b.is_list_item, '|', repr(b.html[:120]))
+    else:
+        print('TABLE', [c.text[:40] for c in b.cells()])
+"
+```
+
+Each `Para` shows its `.style` (e.g. `Heading3`), whether it's a `.is_list_item`, and `.html` — which keeps inline `<a>` / `<strong>`. Build body blocks from `.html` (links + bold preserved verbatim); `.text` is the un-tagged form, handy for spotting a typed `H2:` heading line.
 
 ### Step 2 — Choose a route
 
@@ -134,8 +154,8 @@ Returns `{section_headers, tables, headings, paragraph_count, list_count}`. Use 
 
 | Route | When to use |
 |---|---|
-| **A: Normalize (default)** | `.md` is one or two mechanical fixes from the schema (add bold to a brand header, fix a heading level, strip escape backslashes). Structural correction, not content editing — apply without confirmation. |
-| **B: Emit JSON payload (escape hatch)** | `.md` is structurally alien and rewriting costs more than extracting fields directly. Rare. |
+| **A: Normalize (markdown only)** | `.md` is one or two mechanical fixes from the schema (add bold to a brand header, fix a heading level, strip escape backslashes). Structural correction, not content editing — apply without confirmation. **Don't** transcribe a `.docx` into `.md` — it degrades the in-body tables and links the reader already captured. |
+| **B: Emit JSON payload** | The `.md` is structurally alien, **or the brief is a `.docx`**. Build a `ParsedDoc` JSON from the fields and `upload-prepared`. For a `.docx` this is the default route — it carries the `docx_reader` dump's in-body tables, links, and bold straight through. |
 
 ### Route A — Normalize (to a temp file)
 
