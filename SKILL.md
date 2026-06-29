@@ -78,7 +78,7 @@ PYTHONPATH=<skill-dir> python3 -B -m scripts.run show-workspace
 PYTHONPATH=<skill-dir> python3 -B -m scripts.run playbook-index
 ```
 
-A compact JSON array, one record per client: `{slug, summary, aliases, source}`. This is your cross-client memory, loaded every run — each client's one-line critical fact plus brand `aliases`. Read it BEFORE anything else: the brand an operator names often differs from the slug it uploads under (e.g. **ExampleBrand → `example-hub`**). A per-slug body read (Phase 1.5) cannot surface that — you'd need the slug to find the mapping that gives you the slug. Scan every `aliases` and `summary` for the operator's brand; a match hands you the slug directly.
+A compact JSON array, one record per client: `{slug, summary, aliases, source}` — your cross-client memory, loaded every run. Read it BEFORE listing clients: the brand an operator names often differs from the slug it uploads under (e.g. **ExampleBrand → `example-hub`**), and only this index resolves that mapping *before* client pick. Scan every `aliases` and `summary` for the operator's brand; a match hands you the slug directly.
 
 **Step 1 — List registered clients.**
 
@@ -123,7 +123,7 @@ Step 0 already gave you this client's one-line `summary`; this is the full journ
 
 ## Phase 2 — Pick the brief
 
-Ask: *"Which brief in `briefs/upload/`?"* Accept filename only — `.docx` or `.md`. Prefer `.docx` when both exist (it preserves the table-wrapped body that `.md` flattens).
+Ask: *"Which brief in `briefs/upload/`?"* Accept filename only — `.docx` or `.md`. Prefer `.docx` when both exist (see **Brief format** above).
 
 The file may contain one or many sections. Pre-scan (auto-detects format by extension):
 
@@ -244,33 +244,7 @@ Stdout is JSON `{title, post_id, post_url, edit_url, brand, warnings, media}` (`
 
 ## Phase 4 — (Optional) Record a lesson
 
-Only if you discovered something non-obvious about this client or brief format. Skip for predictable runs:
-
-```bash
-PYTHONPATH=<skill-dir> python3 -B -c "
-from scripts.tools.playbook import append_lesson
-append_lesson(slug='<slug>',
-              headline='<one-line>',
-              body='''<1-3 sentences>''')
-"
-```
-
-**If the lesson is a headline-level fact that must load on EVERY run — above all a brand→slug mapping** (operator names a brand that uploads under a different slug) — also pass `summary=` and `aliases=`. They land in the always-loaded index (Phase 1, Step 0), so next time the mapping surfaces *before* client pick instead of being buried in a slug you don't know yet:
-
-```bash
-PYTHONPATH=<skill-dir> python3 -B -c "
-from scripts.tools.playbook import append_lesson
-append_lesson(slug='example-hub',
-              headline='ExampleBrand (all langs) map to example-hub',
-              body='''Multilingual WP install; REST drafts default to the first language — set language + Yoast by hand.''',
-              summary='ExampleBrand (multiple languages) → example-hub; one multilingual install, drafts default to the first language.',
-              aliases=['examplebrand'])
-"
-```
-
-**Index-field constraints:** `summary` is capped at 200 chars and must be single-line (it loads on every run — write it concise); each `aliases` entry must not contain a comma, the frontmatter delimiter — a comma-alias is silently dropped.
-
-To fix an index line *without* adding a dated entry, call `set_meta(slug, summary='...', aliases=[...])` instead of `append_lesson`.
+Only if you discovered something non-obvious about this client or brief format — skip for predictable runs. To append a lesson with `playbook.append_lesson(...)` — and, for a headline-level fact like a brand→slug mapping, curate the always-load index (`summary=` / `aliases=`, or `set_meta`) — see [`REFERENCE.md`](REFERENCE.md) § "Self-improvement: the playbook" for the call shape and field constraints.
 
 ## Hard rules
 
