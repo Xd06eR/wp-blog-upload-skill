@@ -50,8 +50,13 @@ def _p(*runs: str, style: str = "", list_item: bool = False) -> str:
     return f"<w:p>{ppr}{''.join(runs)}</w:p>"
 
 
-def _r(text: str, bold: bool = False) -> str:
-    rpr = "<w:rPr><w:b/></w:rPr>" if bold else ""
+def _r(text: str, bold: bool = False, vert_align: str = "") -> str:
+    rpr_parts = []
+    if bold:
+        rpr_parts.append("<w:b/>")
+    if vert_align in ("superscript", "subscript"):
+        rpr_parts.append(f'<w:vertAlign w:val="{vert_align}"/>')
+    rpr = f"<w:rPr>{''.join(rpr_parts)}</w:rPr>" if rpr_parts else ""
     return f"<w:r>{rpr}<w:t xml:space=\"preserve\">{text}</w:t></w:r>"
 
 
@@ -91,6 +96,22 @@ class DocxReaderTest(unittest.TestCase):
         doc = self._read(_p(_r("a bullet"), list_item=True) + _p(_r("plain")))
         self.assertTrue(doc.paragraphs[0].is_list_item)
         self.assertFalse(doc.paragraphs[1].is_list_item)
+
+    def test_superscript_run_becomes_sup_in_html(self) -> None:
+        body = _p(_r("m"), _r("2", vert_align="superscript"))
+        self.assertEqual(self._read(body).paragraphs[0].html, "m<sup>2</sup>")
+
+    def test_subscript_run_becomes_sub_in_html(self) -> None:
+        body = _p(_r("H"), _r("2", vert_align="subscript"), _r("O"))
+        self.assertEqual(self._read(body).paragraphs[0].html, "H<sub>2</sub>O")
+
+    def test_bold_and_superscript_combined(self) -> None:
+        body = _p(_r("x", bold=True, vert_align="superscript"))
+        self.assertEqual(self._read(body).paragraphs[0].html, "<sup><strong>x</strong></sup>")
+
+    def test_baseline_vertAlign_is_ignored(self) -> None:
+        body = _p(_r("plain", vert_align="baseline"))
+        self.assertEqual(self._read(body).paragraphs[0].html, "plain")
 
     def test_hyperlink_resolves_to_real_url(self) -> None:
         body = _p(

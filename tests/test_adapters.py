@@ -86,6 +86,18 @@ class EscapeInlineTest(unittest.TestCase):
                     "/relative/path", "#anchor"):
             self.assertIn(f'href="{url}"', escape_inline(f'<a href="{url}">x</a>'))
 
+    def test_sup_tag_preserved(self) -> None:
+        self.assertEqual(escape_inline("m<sup>2</sup>"), "m<sup>2</sup>")
+
+    def test_sub_tag_preserved(self) -> None:
+        self.assertEqual(escape_inline("H<sub>2</sub>O"), "H<sub>2</sub>O")
+
+    def test_sup_tag_escapes_bare_amp_inside(self) -> None:
+        self.assertEqual(
+            escape_inline("<sup>A & B</sup>"),
+            "<sup>A &amp; B</sup>",
+        )
+
 
 class AdapterEscapingTest(unittest.TestCase):
     """The C3 bug end-to-end: a block mixing a link with raw & must not ship raw &."""

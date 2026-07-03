@@ -16,9 +16,10 @@ from __future__ import annotations
 import re
 
 # Recognized inline tags we pass through untouched: <a ...>, </a>, <strong>,
-# </strong>, <em>, </em>, <br>. Anything else is treated as literal text.
+# </strong>, <em>, </em>, <sup>, </sup>, <sub>, </sub>, <br>. Anything else is
+# treated as literal text.
 _INLINE_TAG = re.compile(
-    r"</?(?:a|strong|em|b|i|br)(?:\s[^<>]*)?>",
+    r"</?(?:a|strong|em|b|i|sup|sub|br)(?:\s[^<>]*)?>",
     re.IGNORECASE,
 )
 

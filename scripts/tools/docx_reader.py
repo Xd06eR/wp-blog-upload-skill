@@ -118,6 +118,18 @@ def _is_bold_run(run: ET.Element) -> bool:
     return b.get(_w("val")) not in ("0", "false", "none", "off")
 
 
+def _vert_align(run: ET.Element) -> str:
+    """Return ``superscript`` / ``subscript`` for a run, or ``\"\"``."""
+    rpr = run.find(_w("rPr"))
+    if rpr is None:
+        return ""
+    va = rpr.find(_w("vertAlign"))
+    if va is None:
+        return ""
+    val = va.get(_w("val"), "")
+    return val if val in ("superscript", "subscript") else ""
+
+
 def _run_text(run: ET.Element) -> str:
     """Concatenate the text payload of one ``<w:r>`` (text, tabs, breaks)."""
     parts: list[str] = []
@@ -132,7 +144,7 @@ def _run_text(run: ET.Element) -> str:
 
 
 def _run_html(run: ET.Element) -> str:
-    """One run as inline HTML: bold wrapped in ``<strong>``, text raw.
+    """One run as inline HTML: bold -> ``<strong>``, sup/sub -> tags, text raw.
 
     Text is left un-escaped on purpose -- this mirrors ``parse_md``'s
     ``Block.text`` shape so the editor adapters escape both paths the
@@ -141,7 +153,14 @@ def _run_html(run: ET.Element) -> str:
     text = _run_text(run)
     if not text:
         return ""
-    return f"<strong>{text}</strong>" if _is_bold_run(run) else text
+    if _is_bold_run(run):
+        text = f"<strong>{text}</strong>"
+    va = _vert_align(run)
+    if va == "superscript":
+        text = f"<sup>{text}</sup>"
+    elif va == "subscript":
+        text = f"<sub>{text}</sub>"
+    return text
 
 
 # ---------- block wrappers --------------------------------------------------
