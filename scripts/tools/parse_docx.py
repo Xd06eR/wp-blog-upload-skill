@@ -358,9 +358,20 @@ def _parse_brand_stream(doc: docx_reader.Document, start: int, end: int,
                         *, brand: str, path: Path) -> ParsedDoc:
     """Parse one brand's body from the block slice (start, end)."""
     brief = _kv_brief_in_slice(doc, start, end)
-    # Field tables in the slice are metadata, not body -- feed only paragraphs.
-    paras = [b for b in doc.blocks[start:end] if not isinstance(b, docx_reader.Table)]
-    title, blocks = _walk_blocks(paras, capture_title=True)
+    # The slice contains metadata tables (Content Topic / key-value grids) and
+    # then the body stream. Drop only the leading tables that precede the first
+    # body paragraph; keep any in-body tables (comparison grids, schedules).
+    body_items: list[docx_reader.Para | docx_reader.Table] = []
+    seen_para = False
+    for b in doc.blocks[start:end]:
+        if isinstance(b, docx_reader.Table):
+            if seen_para:
+                body_items.append(b)
+            continue
+        if b.text.strip():
+            seen_para = True
+        body_items.append(b)
+    title, blocks = _walk_blocks(body_items, capture_title=True)
     if not blocks:
         raise ParseError(f"{path}: brand '{brand}' has no body — nothing to upload.")
     # Title precedence: an H1 in the body, then the field-table H1 / meta title,

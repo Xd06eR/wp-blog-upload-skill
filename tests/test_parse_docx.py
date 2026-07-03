@@ -440,6 +440,41 @@ class ParseDocxParagraphStreamTest(unittest.TestCase):
         with self.assertRaises(ParseError):
             parse_docx.parse(path, brand="EmptyBrand")
 
+    def test_in_body_table_preserved_in_paragraph_stream(self) -> None:
+        # Paragraph-stream briefs carry a per-brand metadata table, but they can
+        # also embed real comparison / schedule tables inside the body. Those
+        # in-body tables must not be discarded with the metadata tables.
+        body = (
+            _h3("BrandD (EN)")
+            + _table(
+                _row(_cell(_p(_r("Content Topic"))), _cell(_p(_r("Permits")))),
+                _row(_cell(_p(_r("H1"))), _cell(_p(_r("Permits Guide")))),
+            )
+            + _p(_r("H1: Permits Guide", bold=True))
+            + _p(_r("Intro."))
+            + _table(
+                _row(
+                    _cell(_p(_r("Requirement"))),
+                    _cell(_p(_r("France"))),
+                    _cell(_p(_r("Spain"))),
+                ),
+                _row(
+                    _cell(_p(_r("Permit"))),
+                    _cell(_p(_r("Required"))),
+                    _cell(_p(_r("Required"))),
+                ),
+            )
+            + _p(_r("Outro."))
+        )
+        path = _docx(body)
+        self._paths.append(path)
+        doc = parse_docx.parse(path, brand="BrandD (EN)")
+        kinds = [b.kind for b in doc.body]
+        self.assertIn("table", kinds)
+        table_block = [b for b in doc.body if b.kind == "table"][0]
+        self.assertEqual(len(table_block.rows), 2)
+        self.assertEqual(len(table_block.rows[0]), 3)
+
 
 if __name__ == "__main__":
     unittest.main()
