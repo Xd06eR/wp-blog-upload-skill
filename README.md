@@ -20,6 +20,7 @@ The agent parses a `.docx` or `.md` brief (auto-detected by extension), picks th
 - **SQLite client registry** — onboard new clients via a JSON file; credentials are verified against WP REST before storage.
 - **Pure Python stdlib** — no `pip install`, no virtualenv. Copy the skill folder and go. The native `.docx` reader is stdlib-only (`zipfile` + `xml.etree`), consistent with the skill's no-dependency philosophy.
 - **Per-client playbook** — agent memory stored as markdown lessons so repeat quirks (e.g. "this writer always omits the URL row") are handled automatically.
+- **In-chat help + self-update** — operators say `@blog-upload help` (a quick how-to card plus a hands-on walk-through) or `@blog-upload update` (the agent pulls the latest version and reports what changed). Neither needs a terminal; see [`GUIDE.html`](GUIDE.html).
 - **Hardcoded draft-only** — the CLI refuses to auto-publish. Every upload lands in `status=draft`.
 
 ## How it works
@@ -77,20 +78,23 @@ The repo root **is** the skill — clone it directly, no `skill/` subfolder.
 blog-upload/                ← repo root == the skill
 ├── README.md               ← you are here
 ├── CLAUDE.md               ← maintainer / developer context
+├── AGENTS.md               ← symlink to CLAUDE.md (same context, other agents)
 ├── SKILL.md                ← agent workflow (what the agent follows)
 ├── REFERENCE.md            ← full SOP, CLI reference, failure recovery
+├── HELP.md                 ← in-chat help card + teaching script (agent)
 ├── GUIDE.md / GUIDE.html   ← non-technical guide for end users
 ├── scripts/                ← Python package (pure stdlib)
 │   ├── run.py              ← CLI entrypoint
 │   ├── upload_blog.py      ← orchestrator
 │   ├── schema.sql          ← SQLite DDL (clients + client_history)
-│   ├── adapters/           ← gutenberg, classic, elementor
-│   └── tools/              ← parse_md, wp_client, workspace,
-│                             client_store, client_config, onboarding, playbook
+│   ├── adapters/           ← gutenberg, classic, elementor, _escape
+│   └── tools/              ← intake, parse_md, docx_reader, parse_docx,
+│                             wp_client, workspace, client_store,
+│                             client_config, onboarding, playbook
 └── tests/                  ← stdlib unittest
 ```
 
-Workspace (auto-created on first run in the operator's working directory):
+Workspace (auto-created beside the skill folder on first write):
 
 ```text
 blog-upload-workspace/
@@ -99,7 +103,7 @@ blog-upload-workspace/
 │   ├── secrets/<slug>.json      (chmod 600, never commit)
 │   ├── secrets/.env.example
 │   └── playbooks/<slug>.md
-└── briefs/upload/<name>.md
+└── briefs/upload/<name>.{docx,md}
 ```
 
 ## Installation
@@ -109,14 +113,14 @@ blog-upload-workspace/
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/Xd06eR/wp-blog-upload-skill.git ~/blog-upload
+git clone https://github.com/Xd06eR/wp-blog-upload-skill.git blog-upload
 ```
 
-The repo root *is* the skill, so this puts everything at `~/blog-upload/` — there is no separate copy/install step.
+The repo root *is* the skill, so this puts everything at `blog-upload/` inside whatever folder you cloned from — there is no separate copy/install step. Clone it wherever you do your work; the workspace finds it from any launch directory (see [Workspace location](#workspace-location)).
 
 ### 2. Use it
 
-Launch your AI coding agent (Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, …) from your home folder (`~/`) and **explicitly invoke the skill** by tagging it and the brief. Most agents share the `@`-mention convention; the exact tag syntax may vary by agent:
+Launch your AI coding agent (Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, …) from whatever folder you do your work in, and **explicitly invoke the skill** by tagging it and the brief. Most agents share the `@`-mention convention; the exact tag syntax may vary by agent:
 
 ```text
 @blog-upload upload @my-brief.docx for <Client>
@@ -124,19 +128,19 @@ Launch your AI coding agent (Claude Code, GitHub Copilot, Codex, Kimi Code, Anti
 
 Non-technical operators: open `GUIDE.html` in a browser and follow it step by step.
 
-> **Keep the skill in your working directory and invoke it explicitly.** Installing it into `~/.claude/skills/` for auto-discovery is **not recommended** — auto-invoke can fire on unrelated tasks or fail to trigger mid-upload. Explicit tagging is deterministic.
+> **Keep the skill folder wherever you do your work and invoke it explicitly.** The workspace (`blog-upload-workspace/`) lands beside the skill automatically and the CLI resolves it from any launch directory, so there is no required working folder. Installing it into `~/.claude/skills/` for auto-discovery is **not recommended** — auto-invoke can fire on unrelated tasks or fail to trigger mid-upload. Explicit tagging is deterministic.
 
 ### 3. Get the latest version
 
 ```bash
-cd ~/blog-upload && git pull
+cd <where-you-cloned>/blog-upload && git pull
 ```
 
-Because the skill runs straight from the clone, `git pull` is the entire update — no re-copy, no reinstall.
+Because the skill runs straight from the clone, `git pull` is the entire update — no re-copy, no reinstall. (Operators can also say `@blog-upload update` and the agent runs the pull for them — see [GUIDE.html](GUIDE.html).)
 
 ## Workspace location
 
-Runtime state (clients, credentials, briefs) lives in a `blog-upload-workspace/` folder, separate from the skill. The CLI finds it like this: the nearest `blog-upload-workspace/` in a sub-folder of where you launched (downward search), otherwise it's created in the current folder (`$PWD/blog-upload-workspace`).
+Runtime state (clients, credentials, briefs) lives in a `blog-upload-workspace/` folder, **a sibling of the skill** (a `blog-upload-workspace/` folder next to wherever `blog-upload/` lives). The CLI resolves it in this order: the nearest `blog-upload-workspace/` in a sub-folder of where you launched (downward search), then a workspace beside any ancestor of the launch dir (upward search — so running from *inside* the skill folder still finds it), then the canonical home beside the skill. When none exists yet, write commands (`init-workspace`, `onboard`, `upload`) create it beside the skill; **read-only commands (`list-clients`, `playbook-index`, `show-workspace`) never create one** — they resolve an existing workspace or return empty.
 
 You can **move or rename the workspace freely** — credential paths are stored relative to it and resolved at load time, so nothing breaks.
 
