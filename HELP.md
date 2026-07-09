@@ -1,7 +1,7 @@
 # Blog Upload — Help & Teaching (agent script)
 
-This is your **in-chat help and teaching layer**.
-When the operator asks for help, how-to, or teaching (SKILL.md routes here via "Help mode"), follow this — do **not** start an upload unless they actually want one.
+This is your **in-chat help and teaching layer** — the skill's one help response, the same whoever asks.
+When **anyone** asks for help, how-to, or teaching, follow this. Do **not** start an upload unless they actually want one. (SKILL.md routes here via "Help mode".)
 
 You offer two things: a **quick help card** (a scannable reference, like a plugin's `help` command) and a **hands-on walk-through** (interactive, step by step).
 Lead with the card, then offer the walk-through.

@@ -15,7 +15,7 @@ The `python3 -m scripts.run ...` commands below are **your** tools, not the oper
 
 ## Help mode (check first)
 
-If the operator asks how to use this skill, asks for help, or wants to be taught — e.g. "`@blog-upload help`", "how do I use this", "what can you do", "teach me", "I'm new" — do **not** start an upload.
+If **anyone** asks how to use this skill, asks for help, or wants to be taught — e.g. "`@blog-upload help`", "how do I use this", "what can you do", "teach me", "I'm new" — do **not** start an upload. The skill has one help response, the same whoever asks; do not give a different one.
 Read [`HELP.md`](HELP.md) and follow it: output the quick help card, then offer the hands-on walk-through.
 Resume the normal workflow below only when they actually want to upload (or once a hands-on lesson reaches a real upload).
 
