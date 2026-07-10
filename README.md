@@ -20,7 +20,7 @@ The agent parses a `.docx` or `.md` brief (auto-detected by extension), picks th
 - **SQLite client registry** — onboard new clients via a JSON file; credentials are verified against WP REST before storage.
 - **Pure Python stdlib** — no `pip install`, no virtualenv. Copy the skill folder and go. The native `.docx` reader is stdlib-only (`zipfile` + `xml.etree`), consistent with the skill's no-dependency philosophy.
 - **Per-client playbook** — agent memory stored as markdown lessons so repeat quirks (e.g. "this writer always omits the URL row") are handled automatically.
-- **In-chat help + self-update** — operators say `@blog-upload help` (a quick how-to card plus a hands-on walk-through) or `@blog-upload update` (the agent pulls the latest version and reports what changed). Neither needs a terminal; see [`GUIDE.html`](GUIDE.html).
+- **In-chat help + self-update** — operators say `@blog-upload help` (a quick how-to card, plus interactive hands-on teaching when they ask for it) or `@blog-upload update` (the agent pulls the latest version and reports what changed). Neither needs a terminal; see [`GUIDE.html`](GUIDE.html).
 - **Hardcoded draft-only** — the CLI refuses to auto-publish. Every upload lands in `status=draft`.
 
 ## How it works

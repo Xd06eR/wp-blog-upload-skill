@@ -16,7 +16,7 @@ The `python3 -m scripts.run ...` commands below are **your** tools, not the oper
 ## Help mode (check first)
 
 If **anyone** asks how to use this skill, asks for help, or wants to be taught — e.g. "`@blog-upload help`", "how do I use this", "what can you do", "teach me", "I'm new" — do **not** start an upload. The skill has one help response, the same whoever asks; do not give a different one.
-Read [`HELP.md`](HELP.md) and follow it: output the quick help card, then offer the hands-on walk-through.
+Read [`HELP.md`](HELP.md) and follow it: by default, output **only the quick help card** (a short brief on how to use the skill) and offer the interactive teaching; do not start teaching unprompted. Begin **interactive teaching** only when the user asks for it or accepts the offer (for example, "yes", "teach me", "walk me through it"). Teaching is an agentic guide that adapts to the user: walk them through step by step, or answer any question in any order, and offer to drive a real upload live.
 Resume the normal workflow below only when they actually want to upload (or once a hands-on lesson reaches a real upload).
 
 ## Update mode (check first)
@@ -24,8 +24,18 @@ Resume the normal workflow below only when they actually want to upload (or once
 If the operator asks to update the skill, get the latest version, or check for a newer release — e.g. "`@blog-upload update`", "update this skill", "how do I update", "is there a new version" — do **not** start an upload.
 This skill is a git checkout; you update it by pulling on the operator's behalf — they never run git themselves.
 
-1. **Confirm it's a git checkout.** `git -C <skill-dir> rev-parse --is-inside-work-tree`. If that errors, the skill was copied (not `git clone`d) and can't self-update — tell the operator to re-clone from `https://github.com/Xd06eR/wp-blog-upload-skill.git`, then stop.
-2. **Fast-forward only**, recording the version first so you can report what changed:
+1. **Confirm it's a git checkout.** `git -C <skill-dir> rev-parse --is-inside-work-tree`. If that errors, the skill was copied (not `git clone`d) and can't self-update: tell the operator to re-clone from `https://github.com/Xd06eR/wp-blog-upload-skill.git`, then stop.
+2. **Ensure the remote exists.** If `git -C <skill-dir> remote get-url origin` fails or is empty (the URL was removed by accident), restore it before pulling:
+
+   ```bash
+   # origin missing entirely:
+   git -C <skill-dir> remote add origin https://github.com/Xd06eR/wp-blog-upload-skill.git
+   # or origin present but the URL is wrong:
+   git -C <skill-dir> remote set-url origin https://github.com/Xd06eR/wp-blog-upload-skill.git
+   ```
+
+   The canonical URL is the public repo above. Skip this step when `get-url origin` already returns it.
+3. **Fast-forward only**, recording the version first so you can report what changed:
 
    ```bash
    BEFORE=$(git -C <skill-dir> rev-parse HEAD)
@@ -33,8 +43,8 @@ This skill is a git checkout; you update it by pulling on the operator's behalf 
    git -C <skill-dir> log --oneline "$BEFORE"..HEAD
    ```
 
-   `--ff-only` because the skill folder is immutable by design, so it advances cleanly. If the pull refuses (local edits or diverged history — the folder isn't meant to be edited), do **not** merge, rebase, reset, or force — report what blocked it and stop.
-3. **Report in plain language.** Empty `log` → "already up to date." Otherwise summarize the new commits' subjects (they read `feat:` / `fix:` / `docs:`) as a short what-changed list. Never show raw git output or commit hashes.
+   `--ff-only` because the skill folder is immutable by design, so origin is always strictly ahead and it advances cleanly. In the normal case that is identical to a plain pull; if the folder has been touched or history has diverged, it refuses instead of creating a merge commit. If it refuses, do **not** merge, rebase, reset, or force: report what blocked it and stop.
+4. **Report in plain language.** Empty `log` → "already up to date." Otherwise summarize the new commits' subjects (they read `feat:` / `fix:` / `docs:`) as a short what-changed list. Never show raw git output or commit hashes.
 
 Never touch `blog-upload-workspace/` during an update — it's the operator's data (clients, logins, memory), not part of the skill repo.
 Resume the normal workflow below only when they actually want to upload.
