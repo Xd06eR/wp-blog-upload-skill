@@ -1,6 +1,6 @@
 ---
 name: blog-upload
-description: Upload a finished blog brief (`.docx` or `.md`, auto-detected) as a WordPress draft for the right client: parses the brief, picks the client by name, optionally uploads images, never publishes. Handles single, multi-client, and translation briefs. Use when the user wants to put an SEO blog post on a client WordPress site from a brief — or when they ask how to use this skill, want help, or want to be taught (e.g. `blog-upload help`, "teach me this skill").
+description: Upload a finished blog brief (`.docx`, `.md`, or a ready-made `.html`, auto-detected by extension) as a WordPress draft for the right client: parses the brief, picks the client by name, optionally uploads images, never publishes. A `.html` file is a finished blog — it is uploaded verbatim, preserving its table-of-contents jump links. Handles single, multi-client, and translation briefs. Use when the user wants to put an SEO blog post on a client WordPress site from a brief — or when they ask how to use this skill, want help, or want to be taught (e.g. `blog-upload help`, "teach me this skill").
 ---
 
 # Blog Upload (WordPress)
@@ -8,6 +8,8 @@ description: Upload a finished blog brief (`.docx` or `.md`, auto-detected) as a
 You are the Blog Upload Agent. Drive end-to-end. The operator answers at most three things: *which client?*, *which file?*, *which brief section?* (only if the file holds multiple).
 
 No preview. No approval gate. Straight from the brief (`.docx` or `.md`) to WordPress draft. The writer fills Yoast / RankMath meta in WP admin after the draft appears (those plugins don't support REST).
+
+**A `.html` file is a shortcut, not a brief.** When the operator hands you a `.html` file, it is an already-finished, cleaned blog — upload it **verbatim** (see **[the HTML shortcut](#html-shortcut-for-a-finished-html-blog)** below), never re-parse or re-clean it. That path preserves the article's table-of-contents jump links, which the `.docx`/`.md` render pipeline cannot.
 
 **Brief format — `.docx` is the safer default.** The skill auto-detects by file extension. Writers format briefs differently, and some wrap the whole article body inside a Word table cell. When they do, markdown export *can* flatten that cell into one line and lose the heading/paragraph boundaries, so the `.md` may parse as boilerplate. The `.docx` keeps the structure intact either way — headings, paragraphs, in-body tables, native bullet lists, real hyperlinks. Prefer `.docx` when both exist; `.md` is fine for briefs whose body isn't table-wrapped (e.g. a multi-client `### **Brand**` file).
 
@@ -57,7 +59,7 @@ Resume the normal workflow below only when they actually want to upload.
 | `$WORKSPACE/data/clients.db` | SQLite: registered clients + history | Yes |
 | `$WORKSPACE/data/secrets/<slug>.json` | Per-client WP credentials (chmod 600) | Yes |
 | `$WORKSPACE/data/playbooks/<slug>.md` | Your own memory: what worked last time | Yes |
-| `$WORKSPACE/briefs/upload/<name>.{docx,md}` | Operator drops `.docx` or `.md` briefs here | Yes |
+| `$WORKSPACE/briefs/upload/<name>.{docx,md,html}` | Operator drops `.docx` / `.md` briefs, or a finished `.html` blog, here | Yes |
 
 `$WORKSPACE` resolves in this order:
 1. **Downward search**: the nearest `blog-upload-workspace/` in a sub-folder of `$PWD` (breadth-first, shallowest wins; skips hidden + heavy dirs like `node_modules`/`.git`; bounded by depth + a scanned-dir cap).
@@ -133,7 +135,9 @@ Step 0 already gave you this client's one-line `summary`; this is the full journ
 
 ## Phase 2 — Pick the brief
 
-Ask: *"Which brief in `briefs/upload/`?"* Accept filename only — `.docx` or `.md`. Prefer `.docx` when both exist (see **Brief format** above).
+Ask: *"Which brief in `briefs/upload/`?"* Accept filename only — `.docx`, `.md`, or a finished `.html`. Prefer `.docx` over `.md` when both exist (see **Brief format** above).
+
+**If the file is `.html`, stop here and jump to [the HTML shortcut](#html-shortcut-for-a-finished-html-blog).** A `.html` file is a finished blog, not a brief: it has no client sections to scan, so skip `list-briefs`, Phase 2b, and the fallback routes entirely.
 
 The file may contain one or many sections. Pre-scan (auto-detects format by extension):
 
@@ -251,6 +255,32 @@ Stdout is JSON `{title, post_id, post_url, edit_url, brand, warnings, media}` (`
 > Edit URL: `<edit_url>`
 >
 > Remember to fill the Yoast / RankMath meta description in the WP editor before publishing — it doesn't sync over REST.
+
+## HTML shortcut for a finished `.html` blog
+
+Use this **instead of** the normal Phase 2/3 flow when the operator's file is `.html`. The file is an already-cleaned, complete blog; upload its HTML to WordPress **byte-for-byte** — no `list-briefs`, no parser, no adapter, no normalization. This is the only path that keeps the article's table-of-contents jump links working, because it never destructures the headings.
+
+You still pick the client first (Phase 1). Then one command:
+
+```bash
+PYTHONPATH=<skill-dir> python3 -B -m scripts.run upload-html \
+  --client <SLUG> \
+  --doc $WS/briefs/upload/FILENAME.html
+```
+
+- **Title.** The first `<h1>` in the file becomes the WP post title and is removed from the body (WordPress renders the title as the page's H1, so leaving it would show the headline twice). Pass `--title "…"` to override; with no `<h1>` and no `--title`, the filename is used.
+- **Verbatim body.** Everything else is uploaded exactly as written. **Do not** edit, reformat, or "improve" the HTML — it is already finished.
+- **Featured image (optional).** `--media-dir <folder>` uploads the images in that folder and sets the **first as the featured image**; it does **not** add anything to the body (the HTML already places its own images). Omit it and the writer sets the featured image by hand in WP admin.
+
+```bash
+PYTHONPATH=<skill-dir> python3 -B -m scripts.run upload-html \
+  --client <SLUG> --doc $WS/briefs/upload/FILENAME.html \
+  --media-dir $WS/briefs/upload/<image-folder>
+```
+
+Stdout is the same JSON `{title, post_id, post_url, edit_url, brand, warnings, media}` as `upload` — report the draft + edit URL to the operator the same way, then skip to Phase 4.
+
+> **TOC caveat — verify once per site.** WordPress only keeps the heading `id=` anchors (the jump-link targets) if the posting user has the `unfiltered_html` capability. On a **single-site** install an **Editor/Administrator** has it, so the TOC works. On **multisite**, only a Super Admin has it, so the anchors may be stripped and the TOC links land nowhere. If a TOC comes out broken, tell the operator this is a WP role/install limitation, not a brief problem.
 
 ## Phase 4 — (Optional) Record a lesson
 

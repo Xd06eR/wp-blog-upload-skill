@@ -21,6 +21,8 @@ If you are **running** the skill, read `SKILL.md`. If you are **evolving** it, r
 
 An agent parses a blog brief (`.docx` or `.md`, auto-detected by extension), picks the right client from a local SQLite registry, renders the body for that client's WordPress editor (Gutenberg / Classic / Elementor), and `POST`s it to WP REST as `status=draft`. No preview, no approval gate — the writer reviews in WP admin (where Yoast / RankMath meta must be filled by hand anyway, since those plugins have no REST support). Images supplied alongside the brief (a `--media-dir` folder, or inline `image` blocks in an `upload-prepared` payload) are uploaded to the WP media library, appended to the body, and the first is set as the featured image.
 
+A third input, **`.html`, is a finished blog, not a brief.** The `upload-html` command (`upload_blog.upload_html`) sends the file's HTML to the WP post `content` **verbatim** — no parser, no adapter, no re-clean — lifting only the first `<h1>` into the post title. This is deliberate: it is the sole path that preserves table-of-contents jump links, because the block/adapter pipeline carries no heading `id` (see "Out of scope" / the anchor gap). On this path `--media-dir` sets a featured image only and never appends to the body.
+
 ## Design philosophy (and why)
 
 - **Local agent skill + Python stdlib CLI** (works with any agent that runs a shell — Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, opencode). No server, no `pip install`, zero infrastructure to maintain.
@@ -40,7 +42,7 @@ blog-upload/                     ← this repo == the installable skill (root)
 ├── CLAUDE.md                    ← maintainer context (AGENTS.md symlinks here)
 ├── scripts/                     ← pure-stdlib Python package
 │   ├── run.py                   ← CLI entrypoint (argparse dispatch)
-│   ├── upload_blog.py           ← orchestrator: parse → render → POST
+│   ├── upload_blog.py           ← orchestrator: parse → render → POST (+ upload_html verbatim path)
 │   ├── schema.sql               ← SQLite DDL (clients, client_history, _schema_version)
 │   ├── adapters/                ← gutenberg | classic | elementor | _escape
 │   └── tools/                   ← intake, parse_md, docx_reader, parse_docx,
@@ -50,13 +52,14 @@ blog-upload/                     ← this repo == the installable skill (root)
 
 blog-upload-workspace/           ← per-user state, NOT in this repo (gitignored)
 ├── data/{clients.db, secrets/<slug>.json, playbooks/<slug>.md}
-└── briefs/upload/<name>.{docx,md}
+└── briefs/upload/<name>.{docx,md,html}
 ```
 
 Data flow:
 
 ```text
-brief (.docx | .md) → intake.parser_for() → parse_docx | parse_md → render (adapter) → WP REST /posts (draft)
+brief (.docx | .md)      → intake.parser_for() → parse_docx | parse_md → render (adapter) → WP REST /posts (draft)
+.html (finished blog)    → upload_html: HTML posted verbatim, no parse/render (first <h1> → post title) → WP REST /posts (draft)
 ```
 
 `.docx` parses natively for recognized layouts.

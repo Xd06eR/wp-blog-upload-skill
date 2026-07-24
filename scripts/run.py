@@ -8,6 +8,7 @@ Subcommands:
     init-workspace    Create the workspace skeleton (beside the skill folder)
     show-workspace    Print the resolved workspace path + state
     list-clients      Print registered client slugs (JSON, for the agent)
+    playbook-index    Print the always-load cross-client memory index (JSON)
     onboard           Register a new client from a JSON credentials file
     list-briefs       Pre-scan a .docx/.md brief for embedded client sections
     inspect-brief     Dump every table + heading found in a brief (debug aid
@@ -16,6 +17,8 @@ Subcommands:
                       also uploads a folder of images (first = featured)
     upload-prepared   Upload from an agent-emitted JSON payload (bypasses
                       the markdown parser entirely)
+    upload-html       Upload a finished .html blog verbatim as a WP draft
+                      (no parse/re-clean; preserves TOC anchors + heading ids)
 """
 
 from __future__ import annotations
@@ -69,6 +72,16 @@ def main(argv: list[str] | None = None) -> int:
     p_prepared.add_argument("--from-file", required=True,
                             help="Path to JSON payload (shape documented in REFERENCE.md).")
 
+    p_html = sub.add_parser("upload-html",
+                            help="Upload a finished .html blog verbatim as a WP draft (no parse/re-clean).")
+    p_html.add_argument("--client", required=True, help="Client slug.")
+    p_html.add_argument("--doc", required=True, help="Path to the finished .html file.")
+    p_html.add_argument("--title", default=None,
+                        help="Override the post title (default: the file's first <h1>, else the filename).")
+    p_html.add_argument("--media-dir", default=None,
+                        help="Folder of images to upload; the first becomes the featured image. "
+                             "The body HTML is left untouched (finished HTML already places its images).")
+
     args = parser.parse_args(argv)
 
     if not args.cmd:
@@ -93,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_upload(args)
     if args.cmd == "upload-prepared":
         return _run_upload_prepared(args)
+    if args.cmd == "upload-html":
+        return _run_upload_html(args)
 
     parser.print_help()
     return 2
@@ -217,6 +232,13 @@ def _run_list_briefs(args) -> int:
     if not doc_path.exists():
         print(f"ERROR: brief not found: {doc_path}", file=sys.stderr)
         return 2
+    if doc_path.suffix.lower() == ".html":
+        print(
+            "ERROR: a .html file is a finished blog — upload it directly with "
+            "upload-html, not list-briefs (list-briefs is for .docx/.md briefs).",
+            file=sys.stderr,
+        )
+        return 2
     try:
         briefs = parser_for(doc_path).list_briefs(doc_path)
     except (parse_md.ParseError, docx_reader.DocxError) as e:
@@ -323,6 +345,49 @@ def _run_upload_prepared(args) -> int:
         result = upload_prepared(payload, cfg)
     except ValueError as e:
         print(f"ERROR: invalid payload -- {e}", file=sys.stderr)
+        return 2
+    except Exception as e:
+        print(f"ERROR: upload failed -- {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+
+    print(json.dumps({
+        "title": result.title,
+        "post_id": result.post_id,
+        "post_url": result.post_url,
+        "edit_url": result.edit_url,
+        "brand": result.brand,
+        "warnings": result.warnings,
+        "media": result.media,
+    }, indent=2))
+    return 0
+
+
+def _run_upload_html(args) -> int:
+    workspace.ensure()
+    from .upload_blog import upload_html
+    from .tools.client_store import get_store
+
+    doc_path = Path(args.doc).expanduser().resolve()
+    if not doc_path.exists():
+        print(f"ERROR: HTML file not found: {doc_path}", file=sys.stderr)
+        return 2
+
+    cfg = get_store().get(args.client)
+    if cfg is None:
+        print(
+            f"ERROR: unknown client '{args.client}'. "
+            f"Onboard this client first (see SKILL.md Phase 1).",
+            file=sys.stderr,
+        )
+        return 2
+
+    html = doc_path.read_text(encoding="utf-8")
+    try:
+        result = upload_html(
+            html, cfg, title=args.title, fallback_title=doc_path.stem, media_dir=args.media_dir
+        )
+    except ValueError as e:  # empty body, or bad --media-dir
+        print(f"ERROR: {e}", file=sys.stderr)
         return 2
     except Exception as e:
         print(f"ERROR: upload failed -- {type(e).__name__}: {e}", file=sys.stderr)

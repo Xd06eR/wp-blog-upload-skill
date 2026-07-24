@@ -1,4 +1,4 @@
-"""Tests for upload_blog guards: title template, empty body, tag-length cap.
+"""Tests for upload_blog guards: title template, empty body, keyword/tag rules.
 
 The WP REST client is stubbed so no network call is made.
 Run from the skill root:

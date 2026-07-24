@@ -2,7 +2,7 @@
 
 An **AI agent skill** that uploads blog briefs to WordPress as draft posts — eliminating the copy-paste step between Google Docs and WordPress admin. You drive it in plain English; the agent does the rest.
 
-It accepts both Word (`.docx`) and Markdown (`.md`) briefs, auto-detected by file extension. **`.docx` is the safer default:** writers format briefs differently, and some wrap the blog body inside a table — Markdown export can flatten that table and lose the headings and paragraphs, whereas `.docx` keeps the full structure intact.
+It accepts Word (`.docx`) and Markdown (`.md`) briefs, auto-detected by file extension. **`.docx` is the safer default:** writers format briefs differently, and some wrap the blog body inside a table — Markdown export can flatten that table and lose the headings and paragraphs, whereas `.docx` keeps the full structure intact. A third input, `.html`, is a **finished** blog rather than a brief — it is uploaded **verbatim** (see the `upload-html` shortcut below), which is the only path that preserves table-of-contents jump links.
 
 **Works with any AI coding agent** that can run a shell — Claude Code, GitHub Copilot, Codex, Kimi Code, Antigravity, opencode, and others. Under the hood the agent drives a pure-Python CLI, but **that CLI is the agent's internal engine — operators never type a command, and the prompt templates work the same in every agent.** Examples in these docs use Claude Code's `@` shortcut.
 
@@ -13,6 +13,7 @@ The agent parses a `.docx` or `.md` brief (auto-detected by extension), picks th
 ## Features
 
 - **Word or Markdown briefs** — accepts `.docx` and `.md`, auto-detected by extension. **`.docx` is the safer default** because some briefs wrap the body in a table that Markdown export can flatten (headings/paragraphs lost); `.docx` preserves the full structure. `.md` still works for briefs whose body isn't table-wrapped.
+- **Finished HTML, verbatim** — a `.html` file is a completed, cleaned blog, not a brief. The `upload-html` shortcut POSTs it to WordPress byte-for-byte (no parser, no adapter, no re-clean), so its **table-of-contents jump links and heading anchors survive** — the render pipeline can't preserve those. The first `<h1>` becomes the post title; the body is untouched.
 - **Single- or multi-client briefs** — one brief file can hold briefs for several brands; the agent filters by brand heading (`### **BrandName**`).
 - **Handles varied brief shapes** — the `.docx` reader parses common real-world layouts directly: a table-wrapped body, Roman-numeral field tables, full-width colons, in-body tables, and Word native bullet lists, all without a manual step. Writer formats vary, so for a `.md` that drifts from the schema (and has no `.docx` twin), an **agent-driven fallback** adapts — map it via `inspect-brief`, normalize it, or emit a `ParsedDoc` JSON to `upload-prepared` (using a temp file, cleaned up after); body prose is copied verbatim, never paraphrased.
 - **Per-client editor adapters** — auto-detects and renders Gutenberg blocks, Classic HTML, or Elementor JSON envelopes.
@@ -50,6 +51,8 @@ The agent parses a `.docx` or `.md` brief (auto-detected by extension), picks th
                           ▼
      Draft created  ──▶  Writer fills Yoast / RankMath in WP admin
 ```
+
+**Shortcut — a finished `.html` blog** skips this whole pipeline: `upload-html` sends the file's HTML to `content` verbatim (only lifting the first `<h1>` into the post title), so TOC anchors and heading ids are preserved. No parser, no adapter, no re-clean.
 
 **First-time client onboarding** (one-time per new client, runs before the flow above when the client isn't registered yet):
 
@@ -103,7 +106,7 @@ blog-upload-workspace/
 │   ├── secrets/.env.example
 │   ├── secrets/_pending.json    (ephemeral onboarding draft, auto-deleted)
 │   └── playbooks/<slug>.md
-└── briefs/upload/<name>.{docx,md}
+└── briefs/upload/<name>.{docx,md,html}
 ```
 
 ## Installation

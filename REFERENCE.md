@@ -4,7 +4,7 @@ This document is the long-form expansion of [SKILL.md](SKILL.md). Read it when y
 
 ## Role and tone
 
-You are the **Blog Upload Agent**. The operator feeds you finished blog drafts (`.docx` or `.md`, auto-detected by extension) and you commit them as `status=draft` posts on the right client's WordPress site. `.docx` is the safer default: some briefs wrap the article body in a Word table cell, and markdown export *can* flatten that cell into one line (losing the heading/paragraph structure), while the native `.docx` reader keeps the structure intact.
+You are the **Blog Upload Agent**. The operator feeds you finished blog drafts (`.docx` or `.md`, auto-detected by extension) and you commit them as `status=draft` posts on the right client's WordPress site. `.docx` is the safer default: some briefs wrap the article body in a Word table cell, and markdown export *can* flatten that cell into one line (losing the heading/paragraph structure), while the native `.docx` reader keeps the structure intact. A third input, a finished `.html` blog, is a first-class path of its own: it is uploaded **verbatim** via `upload-html` (no parse, no render), which is the only route that preserves the article's table-of-contents jump links — see "Direct HTML upload" below.
 
 The operator is non-technical. They expect you to handle every technical decision. They see:
 
@@ -20,6 +20,7 @@ That is the entire UX. No preview, no diff, no approval gate. The upload is inte
 | In scope | Out of scope |
 |---|---|
 | Parse `.docx` or `.md` brief (single or multi-client) | Content generation |
+| Upload a finished `.html` blog verbatim (`upload-html`, TOC-preserving) | Cleaning / reformatting a `.html` blog |
 | Pick the right registered client | Image *generation* / editing / resizing |
 | Render body to Gutenberg / Classic / Elementor | Internal-link injection |
 | Upload images + set the first as the featured image | Yoast / RankMath meta (no REST support) |
@@ -42,7 +43,7 @@ $WORKSPACE/
 │   └── playbooks/
 │       └── <slug>.md              ← agent memory: 1-2 line lessons per run
 └── briefs/upload/
-    └── <name>.docx | .md          ← brief the writer dropped (.docx or .md)
+    └── <name>.docx | .md | .html  ← a .docx/.md brief, or a finished .html blog, the operator dropped
 ```
 
 The skill folder itself (`~/blog-upload/`) is immutable code — `SKILL.md`, this file, `scripts/`. Workspace state lives in the operator's project, not in the skill.
@@ -137,10 +138,28 @@ All commands run with `PYTHONPATH=<skill-dir> python3 -B -m scripts.run`, where 
 | `inspect-brief --doc <path.md>` | Dump every table + heading + counts in a **markdown** brief (debug aid when strict parser returns `[]`). Markdown-only — refuses `.docx`; dump an unrecognized `.docx` with `docx_reader` instead (see "Handling alien briefs") | JSON: `{section_headers, tables, headings, paragraph_count, list_count}` |
 | `upload --client <slug> --doc <path> [--brand <name>] [--media-dir <dir>]` | Parse + render + POST as draft (`.docx` / `.md` auto-detected). `--media-dir` uploads every image in the folder (name-sorted), appends them to the body, and sets the first as the featured image | JSON: `{title, post_id, post_url, edit_url, brand, warnings, media}` |
 | `upload-prepared --client <slug> --from-file <payload.json>` | Render + POST from agent-emitted ParsedDoc JSON (bypasses the brief parser) | Same as `upload` |
+| `upload-html --client <slug> --doc <path.html> [--title <t>] [--media-dir <dir>]` | POST a finished `.html` blog **verbatim** as a draft — no parser, no adapter, no re-clean (preserves TOC anchors + heading ids). First `<h1>` becomes the title and is stripped from the body; `--media-dir` sets the first image as featured without touching the body. See "Direct HTML upload" below | Same as `upload` |
 
 `.docx` briefs parse natively for every layout the reader recognizes — no normalize step, and `inspect-brief` doesn't apply (it's a markdown aid). A `.docx` whose layout *isn't* recognized makes `list-briefs` return `[]` (same signal as an alien `.md`); map it with Route B, dumping structure via `docx_reader` (see "Handling alien briefs"). `warnings` is an array of non-fatal advisories (e.g. a defaulted editor); empty when the run was clean. An empty body or missing H1 in a *recognized* layout is a hard error (the run aborts), not a warning.
 
 Non-zero exit codes: `1` runtime failure, `2` bad argument.
+
+## Direct HTML upload (finished `.html` blogs)
+
+A `.html` file is **not** a brief — it is an already-cleaned, finished blog (typically produced by an upstream cleaning step). `upload-html` posts its HTML to WordPress **byte-for-byte, never touching the content**: no `list-briefs`, no `parse_docx`/`parse_md`, no adapter render, no normalization. This is deliberate — re-parsing finished HTML into the block model would both re-clean it and destroy its table-of-contents jump links (the block model carries no heading `id`, and no adapter emits one). Uploading verbatim is the only path that keeps `<h2 id="…">` targets and `<a href="#…">` links intact.
+
+What the command does:
+
+- **Body.** The file's HTML goes straight into the WP post `content` field, unchanged. If the file is a full document, only its `<body>…</body>` inner is used (the `<head>`/chrome is dropped). Do not edit or reformat the content — it is finished.
+- **Title.** The first `<h1>` element's text becomes the WP post title and that one `<h1>` is removed from the body (WordPress renders the title as the page's H1; leaving it would show the headline twice). `--title` overrides; with no `<h1>` and no `--title`, the filename stem is used. `title_template` is applied, same as every other path.
+- **Featured image.** `--media-dir <dir>` uploads every image in the folder and sets the **first as `featured_media`**. Unlike `upload`, it does **not** append image markup to the body — a finished HTML already places its own images, so only the featured thumbnail is missing. Omit it and the writer sets the featured image by hand in WP admin.
+- **Categories & tags.** The client's configured `default_category` and `default_tags` are applied, exactly as on the brief paths (a `.html` file carries no keywords of its own, and briefs' keywords are never auto-tagged regardless).
+- **Empty body → hard error** (exit 2): an HTML file that is blank (or only an `<h1>`) refuses to post, same as the brief paths.
+- **Draft only**, same hardcoded `status=draft`.
+
+Result stdout is the same `{title, post_id, post_url, edit_url, brand, warnings, media}` as `upload` (`brand` is `""`).
+
+**TOC caveat — `unfiltered_html`.** WordPress's `wp_kses` strips `id=` attributes on headings unless the posting user has the `unfiltered_html` capability. On a **single-site** install, **Editor/Administrator** roles have it (the skill already requires that role), so the anchors survive and the TOC works. On **multisite**, only a Super Admin has it, so the heading `id`s — and thus the jump-link targets — can be stripped server-side, breaking the TOC even though the upload sent them. If a TOC lands nowhere, this WP role/install limitation is the cause, not the skill. (The `.docx`/`.md` render path cannot preserve TOCs at all — it has no heading-`id` support — so `upload-html` is the *only* TOC-preserving route.)
 
 ## Handling alien briefs (markdown or docx)
 
@@ -230,7 +249,7 @@ Triggered when `list-clients` doesn't include a slug for the operator's client.
 2. Tell the operator to edit `_pending.json` in their own editor with real WP creds. **Do not read the file yourself.**
 3. Wait for confirmation.
 4. Run `onboard --from-file <path>` (add `--slug <slug>` to override the auto-derived slug). The CLI:
-   - Verifies via `GET /wp-json/wp/v2/users/me`
+   - Verifies via `GET /?rest_route=/wp/v2/users/me` (permalink-independent REST form)
    - Derives the slug from the site URL (or uses `--slug`). It **refuses to silently overwrite a different client that derives the same slug** — on a collision it errors and tells you to pass `--slug`. Re-onboarding the *same* site root is allowed (credential refresh).
    - Detects editor (`gutenberg` / `classic` / `elementor`) by fetching a recent post. Detection is honest: when it can't probe (no posts / probe failed), it defaults to `gutenberg` and surfaces "DEFAULTED — verify in WP admin" instead of pretending it detected.
    - Writes `<slug>.json` (chmod 600)
@@ -258,7 +277,7 @@ All three:
 - Render in-body `table` blocks as real `<table>` markup (not flattened text)
 - Render `image` blocks as the editor's native image markup (Gutenberg `wp:image`, Classic/Elementor `<figure><img>`), referencing the file's WP media URL + id after upload; the first image in the body is set as the post's `featured_media`
 - Inject a hidden `<!-- TODO META FOR HUMAN: ... -->` comment at the top with the meta title, meta description, target URL, and keywords from the brief (Elementor adds a layout-check note), so the writer remembers to fill Yoast / RankMath. Fields interpolated into that comment are injection-safe: a literal `-->` in a value is neutralized so it can't close the comment early
-- Escape literal text spans while preserving recognized inline tags — the inline `<a>` / `<strong>` from the parsers pass through, and only the text between them is `html.escape`-d. Unsafe `<a href>` schemes (`javascript:`, `data:`, `vbscript:`, ...) are stripped — WP bypasses `wp_kses` for Editor/Admin (`unfiltered_html`), so the skill sanitizes its own output; the `<a>` tag and link text survive, only the `href` is dropped
+- Escape literal text spans while preserving recognized inline tags — the inline `<a>` / `<strong>` from the parsers pass through, and only the text between them is HTML-escaped (`&`/`<`/`>`). Unsafe `<a href>` schemes (`javascript:`, `data:`, `vbscript:`, ...) are stripped — WP bypasses `wp_kses` for Editor/Admin (`unfiltered_html`), so the skill sanitizes its own output; the `<a>` tag and link text survive, only the `href` is dropped
 
 The editor is selected per-client from `clients.editor`. Onboarding auto-detects it.
 

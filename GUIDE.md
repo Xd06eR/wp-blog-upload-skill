@@ -29,6 +29,8 @@ Example:
 
 The agent does the rest — reads the brief, finds the client, and creates the draft.
 
+> 📄 **Already have a finished HTML blog?** If your post is already a cleaned, ready-made `.html` file (not a Word or Markdown draft), just give *that* to the agent and ask it to upload — it goes up to WordPress **exactly as-is**, with nothing re-formatted. This is also the only way a post's clickable table-of-contents links keep working. Everything else (picking the client, making a draft, the featured image) works the same.
+
 ---
 
 ## 📋 Ready-Made Prompts (copy-paste — works in any agent)

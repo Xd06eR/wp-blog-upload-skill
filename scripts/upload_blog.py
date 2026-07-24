@@ -1,26 +1,28 @@
-"""Orchestrator: parse a .docx or .md brief and commit it as a WordPress draft.
+"""Orchestrator: commit a brief (or a finished HTML blog) as a WordPress draft.
 
-Pure upload. No preview, no audit log. The brief is the
-finished body prose; this module turns it into editor-specific markup
-and POSTs to WP REST as `status=draft`. SEO meta (Yoast / RankMath) is
-left for the writer to fill manually -- those plugins do not support
-REST.
+Pure upload. No preview, no audit log. Three entry points: `upload_blog` parses
+a `.docx`/`.md` brief and renders it into editor-specific markup;
+`upload_prepared` renders the same way from a pre-parsed JSON `ParsedDoc`
+payload (no file parse); `upload_html` posts a finished `.html` blog verbatim
+(no parse, no render). All POST to WP REST as `status=draft`. SEO meta (Yoast /
+RankMath) is left for the writer to fill manually -- those plugins do not
+support REST.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from . import adapters
-from .tools import parse_md
 from .tools.client_config import ClientConfig
 from .tools.parse_md import Block, Brief, ParsedDoc
 from .tools.wp_client import WPClient, WPCredentials, WPError
 
-__all__ = ["ClientConfig", "UploadResult", "upload_blog", "upload_prepared"]
+__all__ = ["ClientConfig", "UploadResult", "upload_blog", "upload_html", "upload_prepared"]
 
 
 _ALLOWED_BLOCK_KINDS = {"h1", "h2", "h3", "h4", "paragraph", "list", "table", "image"}
@@ -82,7 +84,9 @@ def upload_prepared(payload: dict, client_cfg: ClientConfig) -> UploadResult:
             {"kind": "h2", "text": "..."},
             {"kind": "h3", "text": "..."},
             {"kind": "paragraph", "text": "..."},
-            {"kind": "list", "items": ["...", "..."]}
+            {"kind": "list", "items": ["...", "..."]},
+            {"kind": "table", "rows": [["...", "..."], ["...", "..."]]},
+            {"kind": "image", "src": "/abs/path.jpg", "alt": "..."}
           ]
         }
 
@@ -91,6 +95,118 @@ def upload_prepared(payload: dict, client_cfg: ClientConfig) -> UploadResult:
     """
     doc = _payload_to_parsed_doc(payload)
     return _post_parsed_doc(doc, client_cfg)
+
+
+_H1_RE = re.compile(r"<h1\b[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
+_BODY_RE = re.compile(r"<body\b[^>]*>(.*?)</body>", re.IGNORECASE | re.DOTALL)
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _extract_title_and_body(
+    html: str, override_title: str | None, fallback_title: str
+) -> tuple[str, str]:
+    """Lift the first <h1> into the title and drop that element from the body.
+
+    WordPress renders the post title as the page H1, so keeping the source <h1>
+    in the body would double-title the page. Everything else is left byte-for-
+    byte (TOC anchors, heading ids, inline links all survive). A full-document
+    paste is reduced to its <body> inner first so <head>/chrome never reaches WP.
+    """
+    # ponytail: single-<body> assumption; a multi-body document isn't expected.
+    body_match = _BODY_RE.search(html)
+    if body_match:
+        html = body_match.group(1)
+
+    h1_text = ""
+    m = _H1_RE.search(html)
+    if m:
+        h1_text = _TAG_RE.sub("", m.group(1)).strip()
+        html = html[: m.start()] + html[m.end() :]
+
+    title = (override_title or h1_text or fallback_title or "Untitled").strip()
+    return title, html
+
+
+def _upload_featured(
+    media_dir: str | Path, wp: WPClient, warnings: list[str]
+) -> tuple[int, list[dict]]:
+    """Upload every image in `media_dir`; set the first as the featured image.
+
+    Unlike the .docx/.md path (`_resolve_media`), this does NOT append image
+    markup to the body — a finished HTML already places its own images, so the
+    only gap WordPress has is the featured thumbnail. Returns (featured_id,
+    media_list). A per-image failure is a warning, not a fatal error.
+    """
+    featured = 0
+    media: list[dict] = []
+    for block in _media_dir_blocks(media_dir):
+        try:
+            up = wp.upload_media(block.src, alt_text=block.alt)
+        except (WPError, OSError) as e:
+            warnings.append(f"Image upload failed for {Path(block.src).name}: {e}")
+            continue
+        media_id = int(up.get("id", 0) or 0)
+        if media_id:
+            media.append({"id": media_id, "url": up.get("source_url", "")})
+            if not featured:
+                featured = media_id
+    return featured, media
+
+
+def upload_html(
+    html: str,
+    client_cfg: ClientConfig,
+    *,
+    title: str | None = None,
+    fallback_title: str = "Untitled",
+    media_dir: str | Path | None = None,
+) -> UploadResult:
+    """Upload a finished HTML blog verbatim as a WP draft — no parse, no render.
+
+    The HTML is the completed, cleaned body: it goes to WP `content` byte-for-
+    byte, so TOC anchor links and heading ids are preserved (the parse+adapter
+    path would re-clean and drop them). The first <h1> becomes the post title
+    and is removed from the body; pass `title` to override. `media_dir` uploads
+    images and sets the first as the featured image WITHOUT touching the body.
+    """
+    post_title, body = _extract_title_and_body(html, title, fallback_title)
+    if not body.strip():
+        raise ValueError(
+            "HTML brief produced an empty body — refusing to post a blank draft."
+        )
+
+    creds = WPCredentials.load(client_cfg.wp_credentials_path)
+    wp = WPClient(creds)
+
+    warnings: list[str] = []
+    featured_media, media = (
+        _upload_featured(media_dir, wp, warnings) if media_dir else (0, [])
+    )
+
+    payload: dict[str, Any] = {
+        "title": _apply_title_template(client_cfg.title_template, post_title),
+        "content": body,
+        "status": "draft",
+    }
+    if featured_media:
+        payload["featured_media"] = featured_media
+    if client_cfg.default_category:
+        cat_id = wp.find_category_id(client_cfg.default_category)
+        if cat_id:
+            payload["categories"] = [cat_id]
+    tag_ids = [wp.find_or_create_tag(t) for t in client_cfg.default_tags if t]
+    if tag_ids:
+        payload["tags"] = tag_ids
+
+    post = wp.create_post(payload)
+    return UploadResult(
+        title=payload["title"],
+        post_id=post["id"],
+        post_url=post.get("link", ""),
+        edit_url=f"{creds.site_base}/wp-admin/post.php?post={post['id']}&action=edit",
+        warnings=warnings,
+        media=media,
+    )
 
 
 def _payload_to_parsed_doc(payload: dict) -> ParsedDoc:

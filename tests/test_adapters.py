@@ -1,7 +1,7 @@
 """Tests for the editor adapters (gutenberg / classic / elementor).
 
-Focus: table-block rendering (A4) -- the in-body schedule/comparison
-grids must become valid <table> markup, never <p><table></p>.
+Covers inline escaping + href/attr sanitization, list/heading/table/image
+rendering, and the hidden TODO-META comment, across all three adapters.
 Run from the skill root:
     PYTHONPATH=. python3 -B -m unittest tests.test_adapters -v
 """

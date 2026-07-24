@@ -235,7 +235,7 @@ def set_meta(
     """Update the always-loaded index fields WITHOUT appending a lesson.
 
     Use to curate an existing playbook's one-line index entry (e.g. backfill a
-    brand->slug mapping onto the 5 legacy playbooks). Aliases merge by default;
+    brand->slug mapping onto existing legacy playbooks). Aliases merge by default;
     pass replace_aliases=True to overwrite.
     """
     path = _slug_path(slug)

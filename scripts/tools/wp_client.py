@@ -1,7 +1,8 @@
 """Thin WordPress REST API wrapper — pure stdlib (urllib).
 
-Reuses the wp_credentials.json pattern. Auth is HTTP Basic with WP
-application password (username + app password).
+Loads per-client credentials from data/secrets/<slug>.json (see
+WPCredentials.load). Auth is HTTP Basic with a WP application password
+(username + app password).
 
 Stays dependency-free so the skill folder is drop-in: no pip install
 required.

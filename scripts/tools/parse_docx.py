@@ -13,7 +13,7 @@ first cell):
     | Date | ... |                         <- generic header  (skipped)
     | Client Name | ... | Client URL | ... | <- page_url source
     | I. Page URL | Page Type | Word Count |  <- word_count
-    | II. Keyword(s) for the page |           <- keywords (filled in B2)
+    | II. Keyword(s) for the page |           <- keywords
     | III. Special Requirement |              <- skipped
     | IV. Page title (...) |                  <- meta_title
     | V. Meta description (...) |             <- meta_description

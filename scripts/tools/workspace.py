@@ -5,7 +5,7 @@ A workspace holds the MUTABLE state of the blog-upload skill:
   - data/secrets/<slug>.json  per-client WP credentials (chmod 600)
   - data/secrets/.env.example credentials template
   - data/playbooks/<slug>.md  agent's per-client memory
-  - briefs/upload/<name>.{docx,md} operator drops .docx or .md briefs here
+  - briefs/upload/<name>.{docx,md,html} operator drops .docx/.md briefs or a finished .html blog here
 
 The skill folder itself stays immutable (SKILL.md + scripts); this
 separation makes the skill portable and the workspace local-per-user.

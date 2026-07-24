@@ -1,4 +1,4 @@
-"""Tests for onboarding guards: /admin URL, editor honesty, slug collision.
+"""Tests for onboarding guards: /admin URL, http:// refusal, editor honesty, slug collision.
 
 Network is stubbed (no real WP). Workspace is redirected to a temp dir.
 Run from the skill root:
