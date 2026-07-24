@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS clients (
 
     -- WordPress
     wp_base_url             TEXT NOT NULL,
-    wp_credentials_path     TEXT NOT NULL,         -- absolute path to creds JSON (chmod 600)
+    wp_credentials_path     TEXT NOT NULL,         -- path to creds JSON, relative to workspace (chmod 600)
     editor                  TEXT NOT NULL,         -- gutenberg | elementor | classic
     editor_version          TEXT,
     seo_plugin              TEXT NOT NULL DEFAULT 'none',  -- yoast | rankmath | aioseo | none

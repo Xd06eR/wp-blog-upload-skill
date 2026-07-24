@@ -10,7 +10,7 @@ What the tool does for you:
 
 **What you normally tell it:** the **client name** + the **brief file**. That's all. The agent asks you for anything else it needs (which section to use, a missing login, etc.).
 
-> Works on Mac, Windows, and Linux. **Launch your agent from your work folder** — the first time, it creates the workspace there; after that it finds it automatically (even from sub-folders).
+> Works on Mac, Windows, and Linux. **Launch your agent from your work folder** — the first time, it creates the workspace right next to the skill folder (the same place you set it up); after that it finds it automatically (even from sub-folders).
 
 > 🎓 **New here? Ask the agent to teach you.**
 > Say *"@blog-upload help"* or *"teach me this skill"* — it gives a quick rundown and can walk you through your first upload step by step.

@@ -23,9 +23,9 @@ Public API mirrors ``parse_md``:
     list_briefs(path) -> [BriefSummary, ...]
     parse(path, brand=None) -> ParsedDoc
 
-This commit (A2) handles the SINGLE-body house brief. Multi-body files
-(one .docx, several VI. Body content tables) and the paragraph-stream
-multi-brief layout are added next.
+Handles the single-body house brief, multi-body files (one .docx with
+several VI. Body content tables, e.g. a ZH original + EN translation),
+and the paragraph-stream multi-brief layout (Heading3 brand markers).
 
 Pure stdlib via ``docx_reader``. No pip.
 """

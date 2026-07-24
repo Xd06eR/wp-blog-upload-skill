@@ -74,7 +74,7 @@ In the commands below, `<skill-dir>` is the absolute path to **this skill folder
 PYTHONPATH=<skill-dir> python3 -B -m scripts.run init-workspace
 ```
 
-Idempotent. Creates `$PWD/blog-upload-workspace/{data,briefs/upload}/` plus `data/secrets/.env.example`. Then show the resolved path:
+Idempotent. Creates the workspace skeleton **beside the skill** (`data/`, `briefs/upload/`, `data/secrets/.env.example`) when none exists yet; an existing workspace found by the resolution order above is reused, not duplicated. Then show the resolved path:
 
 ```bash
 PYTHONPATH=<skill-dir> python3 -B -m scripts.run show-workspace

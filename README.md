@@ -26,30 +26,29 @@ The agent parses a `.docx` or `.md` brief (auto-detected by extension), picks th
 ## How it works
 
 ```text
-Operator drops .docx or .md brief ──▶ Agent picks client ──▶ list-briefs (strict parser)
-                                                            │
-                       ┌────────────────────────────────────┤
-                       ▼                                    ▼
-                  match found                          empty [] → alien format
-                       │                                    │
-                       │                            inspect-brief (map tables/headings)
-                       │                                    │
-                       │              ┌─────────────────────┴─────────────────────┐
-                       │              ▼                                           ▼
-                       │   Route A: rewrite as <name>-normalized.md    Route B: emit ParsedDoc JSON
-                       │              │                                           │
-                       │              ▼                                           ▼
-                       │       (re-enters strict path)                    upload-prepared
-                       │              │                                           │
-                       └──────────────┴───────────────┬───────────────────────────┘
-                                                      ▼
-                                            Render body (adapter)
-                                                      │
-                                                      ▼
-                                        POST to WP REST /wp/v2/posts
-                                                      │
-                                                      ▼
-                        Draft created ──▶ Writer fills Yoast / RankMath in WP admin
+   Operator drops a brief  ──▶  Agent picks client
+                          │
+                          ▼
+ list-briefs (strict parser, auto-detects .docx/.md)
+             ┌────────────┴────────────┐
+             ▼                         ▼
+      sections found    empty []  (unrecognized layout)
+             │                         │
+             │                         ▼
+             │                 agentic fallback:
+             │                 • .md   → inspect-brief → Route A (normalize) or Route B (JSON payload)
+             │                 • .docx → docx_reader dump → Route B (JSON payload)
+             │                 both routes upload from a temp file (outside the workspace, deleted after)
+             │                         │
+             └────────────┬────────────┘
+                          ▼
+                Render body (adapter)
+                          │
+                          ▼
+    POST to WP REST /wp/v2/posts  (status=draft)
+                          │
+                          ▼
+     Draft created  ──▶  Writer fills Yoast / RankMath in WP admin
 ```
 
 **First-time client onboarding** (one-time per new client, runs before the flow above when the client isn't registered yet):
@@ -86,7 +85,7 @@ blog-upload/                ← repo root == the skill
 ├── scripts/                ← Python package (pure stdlib)
 │   ├── run.py              ← CLI entrypoint
 │   ├── upload_blog.py      ← orchestrator
-│   ├── schema.sql          ← SQLite DDL (clients + client_history)
+│   ├── schema.sql          ← SQLite DDL (clients, client_history, _schema_version)
 │   ├── adapters/           ← gutenberg, classic, elementor, _escape
 │   └── tools/              ← intake, parse_md, docx_reader, parse_docx,
 │                             wp_client, workspace, client_store,
@@ -102,6 +101,7 @@ blog-upload-workspace/
 │   ├── clients.db
 │   ├── secrets/<slug>.json      (chmod 600, never commit)
 │   ├── secrets/.env.example
+│   ├── secrets/_pending.json    (ephemeral onboarding draft, auto-deleted)
 │   └── playbooks/<slug>.md
 └── briefs/upload/<name>.{docx,md}
 ```

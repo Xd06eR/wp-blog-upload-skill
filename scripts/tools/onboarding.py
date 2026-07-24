@@ -2,7 +2,7 @@
 
 Tests credentials against WP, auto-detects editor type from existing posts,
 and writes the credentials to data/secrets/<slug>.json + a row into the
-clients table. Called by the agent (via onboard_new_client) when a writer
+clients table. Called by the agent (via register_client) when a writer
 references a client we've never seen before.
 """
 

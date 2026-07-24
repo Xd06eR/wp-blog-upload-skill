@@ -5,11 +5,11 @@ drives the workflow described in SKILL.md and invokes this CLI for the
 deterministic bits (parse, render, POST to WP).
 
 Subcommands:
-    init-workspace    Create the workspace skeleton (~/blog-upload-workspace)
+    init-workspace    Create the workspace skeleton (beside the skill folder)
     show-workspace    Print the resolved workspace path + state
     list-clients      Print registered client slugs (JSON, for the agent)
     onboard           Register a new client from a JSON credentials file
-    list-briefs       Pre-scan a markdown brief for embedded client sections
+    list-briefs       Pre-scan a .docx/.md brief for embedded client sections
     inspect-brief     Dump every table + heading found in a brief (debug aid
                       when list-briefs returns empty / strict parser fails)
     upload            Upload one brief (.docx/.md) as a WP draft; --media-dir
@@ -47,8 +47,8 @@ def main(argv: list[str] | None = None) -> int:
                                 "pass this to disambiguate two sites sharing a domain head.")
 
     p_briefs = sub.add_parser("list-briefs",
-                              help="Pre-scan a markdown brief for embedded client sections (JSON).")
-    p_briefs.add_argument("--doc", required=True, help="Path to .md brief.")
+                              help="Pre-scan a .docx or .md brief for embedded client sections (JSON).")
+    p_briefs.add_argument("--doc", required=True, help="Path to .docx or .md brief.")
 
     p_inspect = sub.add_parser("inspect-brief",
                                help="Dump every table + heading found in a brief (debug aid for alien formats).")
@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_upload = sub.add_parser("upload", help="Upload one brief as a WP draft (commits immediately).")
     p_upload.add_argument("--client", required=True, help="Client slug.")
-    p_upload.add_argument("--doc", required=True, help="Path to .md brief.")
+    p_upload.add_argument("--doc", required=True, help="Path to .docx or .md brief.")
     p_upload.add_argument("--brand", default=None,
                           help="Section name inside a multi-brief markdown file (case insensitive).")
     p_upload.add_argument("--media-dir", default=None,

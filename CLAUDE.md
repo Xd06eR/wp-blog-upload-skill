@@ -34,13 +34,14 @@ An agent parses a blog brief (`.docx` or `.md`, auto-detected by extension), pic
 blog-upload/                     ← this repo == the installable skill (root)
 ├── SKILL.md                     ← agent workflow (runtime)
 ├── REFERENCE.md                 ← full agent SOP
+├── HELP.md                      ← in-chat help card + teaching script (agent)
 ├── README.md                    ← project overview
 ├── GUIDE.md / GUIDE.html        ← non-technical user guide
 ├── CLAUDE.md                    ← maintainer context (AGENTS.md symlinks here)
 ├── scripts/                     ← pure-stdlib Python package
 │   ├── run.py                   ← CLI entrypoint (argparse dispatch)
 │   ├── upload_blog.py           ← orchestrator: parse → render → POST
-│   ├── schema.sql               ← SQLite DDL (clients + client_history)
+│   ├── schema.sql               ← SQLite DDL (clients, client_history, _schema_version)
 │   ├── adapters/                ← gutenberg | classic | elementor | _escape
 │   └── tools/                   ← intake, parse_md, docx_reader, parse_docx,
 │                                  wp_client, workspace, client_store,
@@ -69,7 +70,7 @@ A brief that drifts — a `.md` off-schema, or a `.docx` whose layout isn't reco
 - **`tools/parse_md.py`** — strict markdown parser + `inspect()` debug dump. Single- and multi-client briefs (`### **Brand**` sections); strips markdown backslash-escapes (see "Markdown escaping"). Owns the shared helpers `parse_docx` reuses (`_HEADING_LINE`, `clean_keywords`, `_convert_inline`) and the `Brief`/`Block`/`ParsedDoc` dataclasses (`Block.kind` includes `table`).
 - **`tools/workspace.py`** — resolves the workspace root. Order: **downward search** (nearest `blog-upload-workspace/` in a sub-folder of `$PWD`; breadth-first, shallowest wins; skips hidden + heavy dirs; bounded) → **upward search** (first `blog-upload-workspace/` beside an ancestor of `$PWD`, bounded by `_MAX_WALKUP_DEPTH`; resolves the siblings layout when a command runs from inside the skill) → **beside the skill** (`<skill>/../blog-upload-workspace`, anchored via `__file__`): used if present, else the create target. `root()` always returns a path; `find()` returns an existing workspace or `None`, and read-only CLI commands use `find()` so they never create a phantom workspace. No override flag, no env var.
 - **`adapters/`** — one renderer per editor (gutenberg / classic / elementor) + shared `_escape.py`. All demote body `<h1>` to `<h2>` and inject the hidden `<!-- TODO META FOR HUMAN -->` comment. `_escape` carries the cross-adapter rules: escape text spans but keep inline `<a>`/`<strong>`, neutralize `-->` in the meta comment, and `_escape_attr` for image `alt`/`src` attributes. Lists render as `wp:list-item`; `table` blocks as real `<table>`; `image` blocks as the editor's native image markup (`wp:image` / `<figure><img>`).
-- **`tools/client_store.py` + `schema.sql`** — SQLite registry (`clients`, `client_history` with `ON DELETE CASCADE`).
+- **`tools/client_store.py` + `schema.sql`** — SQLite registry (`clients`, `client_history` with `ON DELETE CASCADE`, plus a `_schema_version` bookkeeping table).
 - **`tools/onboarding.py`** — credentials flow: file → CLI → chmod-600 secrets file (the DB records only the path); the agent never sees a raw password. Refuses to silently overwrite a different client that derives the same slug (`--slug` disambiguates), and reports a defaulted vs detected editor honestly.
 - **`tools/wp_client.py`** — thin WP REST client (`urllib`); `upload_media()` POSTs an image file to `/wp/v2/media`. `upload_blog._resolve_media()` calls it for each `image` block, fills `media_id`/`media_url`, and sets the first as the post's `featured_media`; `_media_dir_blocks()` turns a `--media-dir` folder into appended image blocks.
 - **`tools/playbook.py`** — per-client agent memory (`playbooks/<slug>.md`). Two layers: an always-load **index** (`build_index()` → `playbook-index` CLI) of curated `summary` + brand `aliases` per client (frontmatter; hybrid-falls back to the newest headline), and the lazy full **body** (`read(slug)`). The index resolves brand→slug *before* client pick; `set_meta()`/`append_lesson(summary=, aliases=)` curate it.

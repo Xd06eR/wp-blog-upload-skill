@@ -2,7 +2,7 @@
 
 Each adapter exposes one function:
 
-    render(doc, placements, media_map) -> str
+    render(doc) -> str
 
 Built-in adapters live as named modules (gutenberg, classic, elementor).
 Extra adapters can be registered at runtime via `register(editor, render_fn)`.

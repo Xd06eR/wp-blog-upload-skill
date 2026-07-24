@@ -1,4 +1,4 @@
-"""ClientConfig dataclass — mirrors the `clients` table in data/schema.sql.
+"""ClientConfig dataclass — mirrors the `clients` table in scripts/schema.sql.
 
 Lives in its own module so client_store.py can import it without pulling in
 the markdown parser (`parse_md`, which upload_blog.py uses but client_store doesn't need).

@@ -1,7 +1,7 @@
 """Render the parsed AST to Gutenberg block markup.
 
 Gutenberg posts are HTML wrapped in `<!-- wp:* -->` comments. Block types
-used here: heading, paragraph, list. A hidden `<!-- TODO META -->` comment
+used here: heading, paragraph, list, table, image. A hidden `<!-- TODO META -->` comment
 is injected at the top so the writer remembers to fill in Yoast / RankMath
 fields after the upload (those plugins do NOT support REST).
 """

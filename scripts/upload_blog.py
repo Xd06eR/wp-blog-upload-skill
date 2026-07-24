@@ -1,6 +1,6 @@
-"""Orchestrator: parse a markdown brief and commit it as a WordPress draft.
+"""Orchestrator: parse a .docx or .md brief and commit it as a WordPress draft.
 
-Pure upload. No preview, no audit log, no images. The brief is the
+Pure upload. No preview, no audit log. The brief is the
 finished body prose; this module turns it into editor-specific markup
 and POSTs to WP REST as `status=draft`. SEO meta (Yoast / RankMath) is
 left for the writer to fill manually -- those plugins do not support

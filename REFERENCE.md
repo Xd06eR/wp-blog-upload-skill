@@ -34,7 +34,7 @@ If the user asks for anything outside scope, tell them clearly and stop. Do not 
 ```text
 $WORKSPACE/
 ├── data/
-│   ├── clients.db                 ← SQLite: clients + client_history
+│   ├── clients.db                 ← SQLite: clients, client_history, _schema_version
 │   ├── secrets/
 │   │   ├── .env.example           ← credentials template (placeholder shape)
 │   │   ├── _pending.json          ← operator's draft credentials (ephemeral)
@@ -128,7 +128,7 @@ All commands run with `PYTHONPATH=<skill-dir> python3 -B -m scripts.run`, where 
 
 | Subcommand | What it does | Stdout |
 |---|---|---|
-| `init-workspace` | Create `$PWD/blog-upload-workspace/` skeleton | Human readable |
+| `init-workspace` | Create the workspace skeleton beside the skill (when none is found by the resolution order) | Human readable |
 | `show-workspace` | Print resolved workspace path + dirs | JSON |
 | `list-clients` | List registered clients | JSON: `[{slug, display_name, wp_base_url, editor}, ...]` |
 | `playbook-index` | Always-load cross-client memory: one record per playbook — curated `summary` + brand `aliases` (hybrid: falls back to newest headline). Run at Phase 1 **before** client pick to resolve brand→slug | JSON: `[{slug, summary, aliases, source}, ...]` |
@@ -220,7 +220,7 @@ The brief body has already been approved by the writer. The agent's job is *stru
 | `body[].src` | required when kind == `image` | Local file path; uploaded to the WP media library at POST time. The first image in the body becomes the post's `featured_media` |
 | `body[].alt` | optional (image) | Alt text; defaults to empty |
 
-The CLI validates the shape and exits `2` on missing required fields or unknown `kind` values. Body `h1` blocks are demoted to `<h2>` by the adapters because WP already uses the post title as `<h1>`. On success the `UploadResult` (stdout JSON) carries a `warnings` array — non-fatal advisories such as an empty body or a defaulted editor; empty on a clean run. Image blocks are uploaded to the WP media library at POST time; the result JSON also carries a `media` array of the uploaded `{id, url}` and the first image is set as `featured_media`.
+The CLI validates the shape and exits `2` on missing required fields or unknown `kind` values. Body `h1` blocks are demoted to `<h2>` by the adapters because WP already uses the post title as `<h1>`. On success the `UploadResult` (stdout JSON) carries a `warnings` array — non-fatal advisories such as a defaulted editor or a failed image upload; empty on a clean run. (An empty body is a hard error that aborts the run, not a warning — see the CLI reference above.) Image blocks are uploaded to the WP media library at POST time; the result JSON also carries a `media` array of the uploaded `{id, url}` and the first image is set as `featured_media`.
 
 ## Onboarding flow
 
@@ -238,7 +238,7 @@ Triggered when `list-clients` doesn't include a slug for the operator's client.
    - Deletes `_pending.json`
 5. Re-run `list-clients` to confirm the new client appears.
 
-Note: `_normalize_site_root` strips a trailing `/wp-admin` or `/wp-login.php` from the site URL, but **no longer strips `/admin`** — that is a legitimate subdirectory path for some installs.
+Note: `_normalize_site_root` strips a trailing `/wp-admin` or `/wp-login.php` from the site URL, but **no longer strips `/admin`** — that is a legitimate subdirectory path for some installs. An explicit `http://` site URL is **refused** before any network call (the app password would travel in cleartext over basic auth) unless the host is a local dev exception (`localhost`, `127.0.0.1`, `::1`, `*.local`); `https://` and scheme-less URLs pass.
 
 If the WP credentials are wrong, the CLI prints a human-readable error and exits 1. Tell the operator what to fix (usually: app password has spaces, or the WP user doesn't have Editor / Administrator role). If the slug collides with an existing different client, re-run with `--slug <slug>`.
 
