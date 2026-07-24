@@ -16,7 +16,7 @@ Usage:
         get_store().save(ClientConfig(slug="example-client", ...), by="agent")
 
     cfg = get_store().get("example-client")
-    get_store().update_field("example-client", "brand_voice", "...", by="editor")
+    get_store().update_field("example-client", "default_category", "News", by="editor")
 """
 
 from __future__ import annotations
@@ -35,12 +35,9 @@ from . import workspace
 
 # Schema lives inside the package (immutable, ships with code).
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.sql"
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
-_JSON_FIELDS = {
-    "default_tags", "forbidden_words", "required_terms",
-    "internal_link_targets", "primary_writers",
-}
+_JSON_FIELDS = {"default_tags"}
 
 
 class ClientStoreError(Exception):
@@ -96,6 +93,26 @@ class ClientStore:
             con.execute(
                 "UPDATE clients SET wp_credentials_path = 'data/secrets/' || slug || '.json'"
             )
+
+        if current < 3:
+            # Drop the unused client-profile columns. They were persisted (via
+            # asdict) but never read by any code path, and their purposes
+            # (content generation, internal-link injection, editorial workflow,
+            # cross-tool sync) are all out of scope for this skill. Guarded
+            # per-column: a no-op on a fresh DB (column already absent) or on an
+            # old SQLite without DROP COLUMN — an unused leftover column is
+            # harmless (_row_to_config ignores anything not on the dataclass).
+            for col in (
+                "editor_version", "seo_plugin", "brand_voice", "locale",
+                "forbidden_words", "required_terms", "internal_link_targets",
+                "primary_writers", "approval_workflow", "blog_frequency",
+                "slack_channel", "hubspot_company_id", "ahrefs_project_id",
+                "gdrive_folder_id",
+            ):
+                try:
+                    con.execute(f"ALTER TABLE clients DROP COLUMN {col}")
+                except sqlite3.OperationalError:
+                    pass
 
         con.execute(
             "INSERT INTO _schema_version(version) VALUES (?)", (_SCHEMA_VERSION,)
@@ -270,7 +287,7 @@ def _config_to_row(cfg: "ClientConfig") -> dict:
 
     All ClientConfig fields are written; the DB enforces NOT NULL and applies
     defaults declared in schema.sql. We don't filter Nones here — that would
-    silently drop intentional NULL writes (e.g. clearing a brand_voice).
+    silently drop intentional NULL writes (e.g. clearing a default_category).
     """
     data = asdict(cfg)
     for f in _JSON_FIELDS:

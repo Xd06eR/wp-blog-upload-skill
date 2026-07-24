@@ -30,29 +30,9 @@ CREATE TABLE IF NOT EXISTS clients (
     wp_base_url             TEXT NOT NULL,
     wp_credentials_path     TEXT NOT NULL,         -- path to creds JSON, relative to workspace (chmod 600)
     editor                  TEXT NOT NULL,         -- gutenberg | elementor | classic
-    editor_version          TEXT,
-    seo_plugin              TEXT NOT NULL DEFAULT 'none',  -- yoast | rankmath | aioseo | none
     default_category        TEXT,
     default_tags            TEXT NOT NULL DEFAULT '[]',    -- JSON array of strings
     title_template          TEXT NOT NULL DEFAULT '{h1}',
-
-    -- Content / SEO context
-    brand_voice             TEXT,
-    locale                  TEXT NOT NULL DEFAULT 'en-US',
-    forbidden_words         TEXT NOT NULL DEFAULT '[]',
-    required_terms          TEXT NOT NULL DEFAULT '[]',
-    internal_link_targets   TEXT NOT NULL DEFAULT '[]',
-
-    -- Process
-    primary_writers         TEXT NOT NULL DEFAULT '[]',
-    approval_workflow       TEXT,
-    blog_frequency          TEXT,
-
-    -- Cross-system integrations
-    slack_channel           TEXT,
-    hubspot_company_id      TEXT,
-    ahrefs_project_id       TEXT,
-    gdrive_folder_id        TEXT,
 
     -- Metadata
     created_at              TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

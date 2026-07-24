@@ -11,14 +11,12 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 from urllib import error, parse, request
 from urllib.parse import urlparse
 
 from . import workspace
 from .client_store import get_store
-from .wp_client import WPClient, WPCredentials, WPError, _normalize_site_root
+from .wp_client import WPCredentials, WPError, _normalize_site_root
 
 
 @dataclass

@@ -89,5 +89,63 @@ class CredentialPathTest(unittest.TestCase):
         )
 
 
+class MigrationV3Test(unittest.TestCase):
+    """v3 drops the unused client-profile columns from a legacy (v2) db,
+    without losing the client or its still-used fields."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self._tmp.name) / "data" / "clients.db"
+        self.db.parent.mkdir(parents=True)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _make_legacy_db(self) -> None:
+        # A v2-shaped clients table carrying two of the soon-dropped columns.
+        con = sqlite3.connect(self.db)
+        con.executescript(
+            """
+            CREATE TABLE _schema_version (version INTEGER NOT NULL,
+                                          applied_at TEXT DEFAULT CURRENT_TIMESTAMP);
+            INSERT INTO _schema_version(version) VALUES (2);
+            CREATE TABLE clients (
+                slug TEXT PRIMARY KEY, display_name TEXT NOT NULL, primary_domain TEXT NOT NULL,
+                wp_base_url TEXT NOT NULL, wp_credentials_path TEXT NOT NULL, editor TEXT NOT NULL,
+                default_category TEXT, default_tags TEXT NOT NULL DEFAULT '[]',
+                title_template TEXT NOT NULL DEFAULT '{h1}',
+                hubspot_company_id TEXT, brand_voice TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                last_updated TEXT DEFAULT CURRENT_TIMESTAMP, last_updated_by TEXT
+            );
+            INSERT INTO clients(slug, display_name, primary_domain, wp_base_url,
+                                wp_credentials_path, editor, default_category,
+                                hubspot_company_id, brand_voice)
+            VALUES ('acme','Acme','acme.com','https://acme.com',
+                    'data/secrets/acme.json','gutenberg','News','HS123','friendly');
+            """
+        )
+        con.commit()
+        con.close()
+
+    def test_v3_drops_dead_columns_keeps_client(self) -> None:
+        self._make_legacy_db()
+        cfg = ClientStore(self.db).get("acme")  # opening triggers the migration
+        self.assertIsNotNone(cfg)
+        self.assertEqual(cfg.display_name, "Acme")
+        self.assertEqual(cfg.default_category, "News")  # kept field survives
+
+        con = sqlite3.connect(self.db)
+        cols = {r[1] for r in con.execute("PRAGMA table_info(clients)")}
+        version = con.execute(
+            "SELECT MAX(version) FROM _schema_version"
+        ).fetchone()[0]
+        con.close()
+        self.assertEqual(version, 3)
+        self.assertNotIn("hubspot_company_id", cols)
+        self.assertNotIn("brand_voice", cols)
+        self.assertIn("editor", cols)  # a kept column is untouched
+
+
 if __name__ == "__main__":
     unittest.main()
