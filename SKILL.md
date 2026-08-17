@@ -1,6 +1,6 @@
 ---
 name: blog-upload
-description: Upload a finished blog brief (`.docx`, `.md`, or a ready-made `.html`, auto-detected by extension) as a WordPress draft for the right client: parses the brief, picks the client by name, optionally uploads images, never publishes. A `.html` file is a finished blog — it is uploaded verbatim, preserving its table-of-contents jump links. Handles single, multi-client, and translation briefs. Use when the user wants to put an SEO blog post on a client WordPress site from a brief — or when they ask how to use this skill, want help, or want to be taught (e.g. `blog-upload help`, "teach me this skill").
+description: "Upload a finished blog brief (`.docx`, `.md`, or a ready-made `.html`, auto-detected by extension) as a WordPress draft for the right client: parses the brief, picks the client by name, optionally uploads images, never publishes. A `.html` file is a finished blog — it is uploaded verbatim, preserving its table-of-contents jump links. Handles single, multi-client, and translation briefs. Use when the user wants to put an SEO blog post on a client WordPress site from a brief — or when they ask how to use this skill, want help, or want to be taught (e.g. `blog-upload help`, 'teach me this skill')."
 ---
 
 # Blog Upload (WordPress)
